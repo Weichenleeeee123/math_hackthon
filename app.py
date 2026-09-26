@@ -26,6 +26,7 @@ from glance_sahi.viz import draw_dets, draw_slices, overlay_heat  # noqa: E402
 EXAMPLES = ROOT / "datasets" / "VisDrone2019-DET-val" / "images"
 EXAMPLE_NAMES = ["0000001_02999_d_0000005.jpg", "0000022_01036_d_0000006.jpg", "0000242_00001_d_0000001.jpg",
                  "0000330_00801_d_0000804.jpg", "0000026_01500_d_0000026.jpg"]
+DOTA_EXAMPLES = ["P1029.jpg", "P1179.jpg"]   # 中等幅面 28 片 / 大幅面 6.5K×6.6K 256 片
 
 
 def to_np(preds):
@@ -44,6 +45,10 @@ def resolve_dataset(weights: str, dataset: str) -> str:
 def router_for(dataset: str) -> Path:
     """路由器是在某个检测器的扫视输出上训练的，换检测器必须换路由器（与 run_eval 的结果目录一致）。"""
     return ROOT / "results" / ("router.json" if dataset == "visdrone" else f"{dataset}/router.json")
+
+
+# 手工门的默认工作点（REPORT 3.2 / 3.7）：COCO 检测器在 DOTA 俯视图上几乎认不出目标，要靠边缘先验
+DEFAULT_GATE = {"dota": (0.5, 1.0)}
 
 
 def make_runner(model, device, exclude_ids, router: Path):
@@ -120,14 +125,16 @@ def main():
     ds = resolve_dataset(a.weights, a.dataset)
     router = Path(a.router) if a.router else router_for(ds)
     print(f"检测器 {a.weights}，类别表 {ds}，路由器 {router}（{'存在' if router.exists() else '缺失'}）")
+    theta0, lam0 = DEFAULT_GATE.get(ds, (0.9, 0.3))
     model = build_model(a.weights, conf=0.05, device=device)
     run = make_runner(model, device, datasets.get(ds)["exclude_coco_ids"], router)
-    examples = [[str(EXAMPLES / n)] for n in EXAMPLE_NAMES if (EXAMPLES / n).exists()]
+    ex_dir, ex_names = (datasets.get(ds)["images"], DOTA_EXAMPLES) if ds.startswith("dota") else (EXAMPLES, EXAMPLE_NAMES)
+    examples = [[str(ex_dir / n)] for n in ex_names if (ex_dir / n).exists()]
 
     # 预热：CUDA 上下文、cuDNN 选算法、路由器加载都在第一次调用时发生（实测首张 SAHI 6.3 s，之后 0.35 s），
     # 不预热的话评委点的第一张图耗时对比完全失真。
     t0 = time.perf_counter()
-    run(np.zeros((1080, 1920, 3), np.uint8), 0.9, 0.3, 0.0, 0.25)
+    run(np.zeros((1080, 1920, 3), np.uint8), theta0, lam0, 0.0, 0.25)
     print(f"预热完成 {time.perf_counter() - t0:.1f}s")
 
     with gr.Blocks(title="Glance-SAHI：先扫一眼，只切可疑区域") as demo:
@@ -137,8 +144,8 @@ def main():
         with gr.Row():
             with gr.Column(scale=1):
                 inp = gr.Image(label="上传航拍图", type="numpy")
-                theta = gr.Slider(0.5, 0.999, 0.9, step=0.005, label="手工门阈值 θ")
-                lam = gr.Slider(0.0, 1.0, 0.3, step=0.05, label="边缘先验权重 λ")
+                theta = gr.Slider(0.3, 0.999, theta0, step=0.005, label="手工门阈值 θ")
+                lam = gr.Slider(0.0, 1.0, lam0, step=0.05, label="边缘先验权重 λ（可学习路由固定用训练时的 λ）")
                 rho = gr.Slider(0.0, 1.0, 0.0, step=0.05, label="路由器预算 ρ（0 = 默认全局阈值）")
                 ms = gr.Slider(0.05, 0.9, 0.25, step=0.05, label="显示框的最低置信度")
                 btn = gr.Button("运行三种方法", variant="primary")
