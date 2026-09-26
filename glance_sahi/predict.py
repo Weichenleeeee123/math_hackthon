@@ -31,6 +31,7 @@ class GlanceStats:
     slices: list = field(default_factory=list)
     evidence: np.ndarray | None = None   # 每片的绝对证据量（mode="evidence" 用）
     heat: np.ndarray | None = None       # det_prior="heatmap" 时的缩略图热图（可视化用）
+    glance_boxes: np.ndarray | None = None  # 扫视阶段的弱检测 (x1, y1, x2, y2, conf)，可视化用
     t_glance: float = 0.0     # 整图缩小推理
     t_saliency: float = 0.0   # 打分 + 选片
     t_slices: float = 0.0     # 切片推理
@@ -123,6 +124,7 @@ def glance_sliced_prediction(
     else:
         glance_np = np.array([p.bbox.to_xyxy() + [p.score.value, p.category.id] for p in glance],
                              dtype=np.float32).reshape(-1, 6)
+        st.glance_boxes = glance_np[:, :5]  # 扫视阶段的弱检测 (x1, y1, x2, y2, conf)，可视化用
         scores, st.evidence, st.heat = score_slices(image, glance_np, slices, cfg)
         if cfg.scorer == "learned":
             thr = cfg.router_threshold if cfg.router_threshold is not None \
