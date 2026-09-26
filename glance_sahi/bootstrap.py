@@ -84,7 +84,7 @@ def paired_bootstrap(prepared: dict, times: dict | None, refs, n_boot: int = 200
             for m in metrics:
                 boot_ap[n][m][b] = 100 * a[m]
             if times is not None:
-                boot_t[n][b] = times[n][idx].mean()
+                boot_t[n][b] = np.nanmean(times[n][idx])  # NaN = 该图上放不进显存
     rows = []
     for ref in refs:
         for n in names:
@@ -94,8 +94,8 @@ def paired_bootstrap(prepared: dict, times: dict | None, refs, n_boot: int = 200
                 row[f"d{m}"] = 100 * (point[n][m] - point[ref][m])
                 row[f"d{m}_lo"], row[f"d{m}_hi"] = np.percentile(boot_ap[n][m] - boot_ap[ref][m], [2.5, 97.5])
             if times is not None:
-                row["ms_per_img"] = 1000 * times[n].mean()
-                row["time_ratio"] = times[n].mean() / times[ref].mean()
+                row["ms_per_img"] = 1000 * np.nanmean(times[n])
+                row["time_ratio"] = np.nanmean(times[n]) / np.nanmean(times[ref])
                 row["time_ratio_lo"], row["time_ratio_hi"] = np.percentile(boot_t[n] / boot_t[ref], [2.5, 97.5])
             rows.append(row)
     return rows
