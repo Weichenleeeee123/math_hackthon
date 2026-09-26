@@ -23,7 +23,22 @@ DOTA_TO_EVAL = {10: 1, 9: 1, 1: 2, 0: 3}
 COCO_TO_EVAL = {2: 1, 5: 1, 7: 1, 8: 2, 4: 3}  # car, bus, truck, boat, airplane
 
 
-def convert(root: Path, out_json: Path, limit: int | None = None) -> dict:
+# 换成在 DOTA 上训练过的 OBB 检测器（yolo11*-obb.pt，15 类）后，全部 15 类都能评测：
+# 类别 id = DOTA id + 1；旋转框取外接水平框（DOTA Task2 的 HBB 口径），检测端用 SAHI 给的 obb.xyxy。
+ALL_CATEGORIES = [{"id": i + 1, "name": n} for i, n in enumerate([
+    "plane", "ship", "storage tank", "baseball diamond", "tennis court", "basketball court",
+    "ground track field", "harbor", "bridge", "large vehicle", "small vehicle", "helicopter",
+    "roundabout", "soccer ball field", "swimming pool"])]
+DOTA_TO_ALL = {i: i + 1 for i in range(15)}
+OBB_TO_EVAL = dict(DOTA_TO_ALL)  # 检测器输出的类别 id 与 DOTA id 相同
+
+
+def convert_all(root: Path, out_json: Path, limit: int | None = None) -> dict:
+    return convert(root, out_json, limit, mapping=DOTA_TO_ALL, categories=ALL_CATEGORIES)
+
+
+def convert(root: Path, out_json: Path, limit: int | None = None,
+            mapping: dict = DOTA_TO_EVAL, categories: list = EVAL_CATEGORIES) -> dict:
     img_dir, lab_dir = root / "images" / "val", root / "labels" / "val"
     images, annotations = [], []
     files = sorted(img_dir.glob("*.jpg")) + sorted(img_dir.glob("*.png"))
@@ -38,7 +53,7 @@ def convert(root: Path, out_json: Path, limit: int | None = None) -> dict:
             continue
         for line in lab.read_text().splitlines():
             v = line.split()
-            if len(v) < 9 or int(v[0]) not in DOTA_TO_EVAL:
+            if len(v) < 9 or int(v[0]) not in mapping:
                 continue
             pts = np.array(v[1:9], dtype=np.float32).reshape(4, 2) * [w, h]
             x1, y1 = pts.min(0)
@@ -46,9 +61,9 @@ def convert(root: Path, out_json: Path, limit: int | None = None) -> dict:
             bw, bh = float(x2 - x1), float(y2 - y1)
             if bw < 1 or bh < 1:
                 continue
-            annotations.append({"id": ann_id, "image_id": img_id, "category_id": DOTA_TO_EVAL[int(v[0])],
+            annotations.append({"id": ann_id, "image_id": img_id, "category_id": mapping[int(v[0])],
                                 "bbox": [float(x1), float(y1), bw, bh], "area": bw * bh, "iscrowd": 0})
             ann_id += 1
-    coco = {"images": images, "annotations": annotations, "categories": EVAL_CATEGORIES}
+    coco = {"images": images, "annotations": annotations, "categories": categories}
     out_json.write_text(json.dumps(coco))
     return coco

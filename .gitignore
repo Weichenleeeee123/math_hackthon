@@ -22,3 +22,10 @@ results/*/det_cache.pkl
 Thumbs.db
 Desktop.ini
 ~$*
+
+# ---- 强基线逐图结果（strong_baselines.py run 生成，可重跑） ----
+results/strong*.pkl
+results/*/strong*.pkl
+
+# ---- 微调训练输出（train_visdrone.py） ----
+runs_ft/

@@ -197,9 +197,15 @@ def test_category_maps_and_dataset_registry():
     assert v["exclude_coco_ids"] == [i for i in range(80) if i not in COCO_TO_EVAL]
     assert 0 not in v["exclude_coco_ids"] and v["max_dets"] == 500
     assert datasets.get("dota")["max_dets"] == 2000
-    assert set(datasets.DATASETS) == {"visdrone", "dota", "sparse4k"}  # sparse4k = 受控实验画布
+    # sparse4k = 受控实验画布；dota15 = 同一份 DOTA val 评全部 15 类（配 OBB 检测器），真值另存
+    assert set(datasets.DATASETS) == {"visdrone", "visdrone_ft", "dota", "dota15", "sparse4k"}
+    ft = datasets.get("visdrone_ft")
+    assert ft["gt"] == v["gt"] and ft["coco_to_eval"] == {0: 1, 1: 2}  # 同一份真值，只换检测器类别表
     sp = datasets.get("sparse4k")
     assert sp["coco_to_eval"] == COCO_TO_EVAL and sp["gt"].name == "coco_eval.json"
+    d15 = datasets.get("dota15")
+    assert d15["gt"].name == "coco_eval_dota15.json" and d15["gt"] != datasets.get("dota")["gt"]
+    assert d15["coco_to_eval"] == {i: i + 1 for i in range(15)} and d15["exclude_coco_ids"] == list(range(15, 80))
 
     cfg = GlanceConfig()
     assert cfg.det_prior == "noisyor" and cfg.img_prior == "edge" and cfg.threshold == 0.9

@@ -38,11 +38,12 @@ from glance_sahi.selector import random_slices, select_slices  # noqa: E402
 DS = IMAGES = GT = RES = CACHE = COCO_TO_EVAL = EXCLUDE = None
 
 
-def set_dataset(name="visdrone"):
+def set_dataset(name="visdrone", res_tag=""):
+    """res_tag：结果目录后缀（如换检测器/网格后另起目录，不覆盖原有 cache 与 csv）。"""
     global DS, IMAGES, GT, RES, CACHE, COCO_TO_EVAL, EXCLUDE
     DS = datasets.get(name)
     IMAGES, GT, COCO_TO_EVAL, EXCLUDE = DS["images"], DS["gt"], DS["coco_to_eval"], DS["exclude_coco_ids"]
-    RES = ROOT / "results" if name == "visdrone" else ROOT / "results" / name
+    RES = ROOT / "results" if name == "visdrone" and not res_tag else ROOT / "results" / f"{name}{res_tag}"
     CACHE = RES / "cache.pkl"
 
 
@@ -57,14 +58,14 @@ def preds_to_np(preds):
                     dtype=np.float32).reshape(-1, 6)
 
 
-def warmup(model, images, n=3):
+def warmup(model, images, n=3, slice_size=512):
     """用真实尺寸的整图和 512 切片预热（首次遇到新输入尺寸时 CUDA/cuDNN 会有一次性开销，不应计入耗时）。"""
     from sahi.predict import get_prediction
 
     for im in images[:n]:
         img = load_rgb(IMAGES / im["file_name"])
         get_prediction(img, model)
-        get_prediction(img[:512, :512], model)
+        get_prediction(img[:slice_size, :slice_size], model)
 
 
 # ----------------------------------------------------------------------------------------- cache
@@ -75,13 +76,13 @@ def cmd_cache(args):
     from glance_sahi.detector import build_model
 
     EXCLUDE_COCO_IDS = EXCLUDE
-    cfg = GlanceConfig()
+    cfg = GlanceConfig(slice_size=args.slice_size)
     coco = json.loads(GT.read_text())
     images = coco["images"][: args.limit] if args.limit else coco["images"]
-    model = build_model(args.weights, conf=cfg.output_conf, device=args.device)
-    warmup(model, images)
+    model = build_model(args.weights, conf=cfg.output_conf, device=args.device, image_size=args.imgsz)
+    warmup(model, images, slice_size=cfg.slice_size)
 
-    cache = {"weights": args.weights, "cfg": cfg.__dict__, "images": []}
+    cache = {"weights": args.weights, "imgsz": args.imgsz, "cfg": cfg.__dict__, "images": []}
     for im in tqdm(images, desc="cache"):
         img = load_rgb(IMAGES / im["file_name"])
         h, w = img.shape[:2]
@@ -356,12 +357,12 @@ def cmd_e2e(args):
     from glance_sahi.predict import full_image_prediction, glance_sliced_prediction, sahi_uniform_prediction
 
     EXCLUDE_COCO_IDS = EXCLUDE
-    cfg = GlanceConfig(threshold=args.op, img_prior="edge", img_weight=args.img_weight)
+    cfg = GlanceConfig(threshold=args.op, img_prior="edge", img_weight=args.img_weight, slice_size=args.slice_size)
     gt_path = GT
     coco = json.loads(gt_path.read_text())
     images = coco["images"][: args.limit] if args.limit else coco["images"]
-    model = build_model(args.weights, conf=cfg.output_conf, device=args.device)
-    warmup(model, images)
+    model = build_model(args.weights, conf=cfg.output_conf, device=args.device, image_size=args.imgsz)
+    warmup(model, images, slice_size=cfg.slice_size)
 
     dets = {"full_image": [], "sahi_uniform": [], "glance_sahi": [], "glance_all_slices": []}
     times = {k: [] for k in dets}
@@ -468,6 +469,9 @@ if __name__ == "__main__":
     ap.add_argument("--only", default="", help="sim 只跑这些消融变体（逗号分隔，如 uncertain,max,heatmap）；留空=全部")
     ap.add_argument("--no-random", action="store_true", help="sim 跳过随机对照（快速冒烟用）")
     ap.add_argument("--dataset", default="visdrone", choices=list(datasets.DATASETS))
+    ap.add_argument("--slice-size", type=int, default=512, help="cache/e2e 的切片边长（SAHI 基线与 Glance 共用）")
+    ap.add_argument("--imgsz", type=int, default=640, help="检测器输入尺寸（OBB 检测器用 1024）")
+    ap.add_argument("--res-tag", default="", help="结果目录后缀：results/<dataset><res-tag>/，不覆盖原结果")
     a = ap.parse_args()
-    set_dataset(a.dataset)
+    set_dataset(a.dataset, a.res_tag)
     {"cache": cmd_cache, "sim": cmd_sim, "e2e": cmd_e2e, "buckets": cmd_buckets}[a.cmd](a)
