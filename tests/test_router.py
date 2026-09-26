@@ -64,6 +64,25 @@ def test_online_features_equal_offline():
     assert np.array_equal(a, RT.features_from_rec(r, cfg))
 
 
+def test_online_router_uses_training_lambda(tmp_path):
+    """在线打分必须用 router.json 里记录的训练 λ，而不是调用方 cfg 的 λ（DOTA 路由在 λ=1.0 上训练）。"""
+    from glance_sahi.predict import score_slices
+
+    rng = np.random.default_rng(2)
+    img = (rng.random((700, 1300, 3)) * 255).astype(np.uint8)
+    r = _rec(h=700, w=1300)
+    sal, scale = image_prior_map(img, "edge", 512)
+    r["prior_edge"] = region_prior(sal, scale, r["slices"])
+    X = RT.features_from_rec(r, GlanceConfig(img_weight=1.0))
+    m = RT.train_router(X, (X[:, 0] > 0.5).astype(np.float32), hidden=0, epochs=20, seed=0)
+    path = tmp_path / "r.json"
+    RT.save_router([m], {"img_weight": 1.0, "default_threshold": 0.5}, path)
+    RT.load_router.cache_clear()
+    p, _, _ = score_slices(img, r["glance"], r["slices"],
+                           GlanceConfig(scorer="learned", router_path=str(path), img_weight=0.3))
+    assert np.allclose(p, RT.NumpyRouter([m]).predict_proba(X), atol=1e-6)
+
+
 # ---------------------------------------------------------------- 标签
 def test_gain_label_counts_only_new_hits():
     r = _rec(n=0)

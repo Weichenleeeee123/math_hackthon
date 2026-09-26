@@ -9,7 +9,7 @@ SAHI 原流程：                               Glance-SAHI：
 """
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 from sahi.predict import POSTPROCESS_NAME_TO_CLASS, filter_predictions, get_prediction
