@@ -43,8 +43,13 @@ if __name__ == "__main__":
         root.mkdir(parents=True, exist_ok=True)
         zip_path = root / f"{name}.zip"
         print(f"downloading {url}")
-        urllib.request.urlretrieve(url, zip_path)
-        zipfile.ZipFile(zip_path).extractall(root)
+        if not zip_path.exists():
+            urllib.request.urlretrieve(url, zip_path)
+        with zipfile.ZipFile(zip_path) as zf:
+            # DOTA 整包含 train/val/test，全部解开要再占约 2GB；评测只需要 val
+            keep = [m for m in zf.namelist() if name != "DOTAv1" or "/val/" in m or m.rstrip("/").endswith("/val")]
+            zf.extractall(root, members=keep)
+        print(f"解压完成。{zip_path} 仍保留，确认无误后请自行删除以释放空间")
 
     coco = convert(data_dir, data_dir / gt_name, args.limit)
     n_obj = sum(1 for a in coco["annotations"] if not a["iscrowd"])
