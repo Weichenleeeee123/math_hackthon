@@ -10,6 +10,7 @@ SAHI 对整张图均匀切片、每片都跑一次检测器；Glance-SAHI 先把
 | VisDrone2019-DET-val（548 张，密集城市航拍） | −21%（θ=0.9） / −37%（θ=0.99） | +12%（端到端） / +31% | AP −0.13 / −0.50 |
 | 同上，可学习路由（留出 274 张，报告 3.15） | −50% | 约 +44%（离线，含路由打分） | AP +0.02（95% 区间跨 0） |
 | DOTA-v1.0 val（458 张，大幅面遥感） | −42%（仅边缘先验 θ=0.5） | +35% | AP 2.53 → 2.61（COCO 模型在俯视图上绝对精度低，见报告 3.7） |
+| 同上，可学习路由（留出 229 张，报告 3.17） | −46% | +41%（离线） | AP +0.08（95% 区间跨 0） |
 
 4K 受控实验（自造画布，只是机制验证、不含检测器，见报告 3.10）：目标只占 1.4% 面积时 **87.3% 的切片是空的**（SAHI 仍恒定切 60 片/图）。
 
@@ -21,8 +22,9 @@ SAHI 对整张图均匀切片、每片都跑一次检测器；Glance-SAHI 先把
 再往后两节把手工门换成学出来的门，并给所有关键差值配上区间：
 - **3.15 可学习稀疏路由器**：23 个参数的线性门，吃同一眼扫视的 22 维特征，标签是"跑这片能不能多检出东西"。切片级 PR-AUC 0.76 → 0.90；**只跑 50% 切片时 AP 28.54，与 SAHI 全切 28.52 持平**（手工门同预算 27.21）。起作用的是"增量标签 + 全局阈值"，L1 稀疏正则没有贡献（如实写在报告里）。
 - **3.16 配对 bootstrap**：手工门 θ=0.9 比 SAHI 少 0.12–0.15 AP，区间不含 0（小但真实）；可学习路由在 50% 预算下与 SAHI 的 AP 差区间跨 0，AP_small 反而高 0.43 [0.19, 0.77]（只在留出集 274 张上验证）。
+- **3.17 DOTA 复现**：同一套代码换到 DOTA，路由器用 54% 切片、AP 与 SAHI 无显著差（+0.08 [−0.09, +0.16]），比同预算手工门高 0.41 [0.13, 0.68]。DOTA 上交叉验证选中了 MLP（VisDrone 上是线性），最重要的特征也换成了图像尺度和边缘先验排名。
 
-交互 Demo：`app.py`（Gradio），同一张图并排跑 SAHI / 手工门 / 可学习路由，显示真实切片数、耗时与相对 SAHI 的提速。
+交互 Demo：`app.py`（Gradio），同一张图并排跑 SAHI / 手工门 / 可学习路由，显示真实切片数、耗时与相对 SAHI 的提速；`app.py --dataset dota` 切到 DOTA 的路由器、默认工作点与示例图。
 
 ## 仓库里有什么 / 需要自己准备什么
 
@@ -72,9 +74,10 @@ scripts/
   edge_vs_random.py   DOTA 上“仅边缘先验” vs 同数量随机选片
   pick_cases.py       挑选展示案例
 app.py                交互 Demo（Gradio）：SAHI / 手工门 / 可学习路由并排对比
-tests/                单元测试 49 项：test_core.py 28 项（网格与 SAHI 一致、noisy-OR 累积弱证据、热图、打分变体、
-                      τ/θ/E 选片、规则层、类别映射、分箱标定 PAVA/ECE、主动选片）；test_router.py 15 项（特征与
-                      离线一致、增量标签、路由选片）；test_bootstrap.py 3 项（与 pycocotools 一致）；test_train_visdrone.py 3 项
+tests/                单元测试 51 项：test_core.py 28 项（网格与 SAHI 一致、noisy-OR 累积弱证据、热图、打分变体、
+                      τ/θ/E 选片、规则层、类别映射、分箱标定 PAVA/ECE、主动选片）；test_router.py 16 项（特征与
+                      离线一致、在线打分用训练时的 λ、增量标签、路由选片）；test_bootstrap.py 4 项（与 pycocotools 一致）；
+                      test_train_visdrone.py 3 项
 results/              VisDrone 的 CSV、图、可视化（含 3.12–3.14 的 calibration/calib_*/attribution/active_* 与 fig9–fig11）
 results/dota/         DOTA 的 CSV、图、可视化
 results/legacy_saliency_sahi/  参照实现归档的 v0→v1 诊断数据（slice_gain.csv 等，见 REPORT 3.8）
@@ -108,7 +111,10 @@ $py = ".\.venv\Scripts\python.exe"
 & $py scripts/train_router.py                        # 可学习稀疏路由器（离线，CPU 约 10–20 分钟）→ router.json / router_*.csv / fig12、fig14
 & $py scripts/train_router.py --split sequence --tag _seq --no-ablations   # 按视频序列划分复查泄漏
 & $py scripts/bootstrap_ci.py                        # 留出集配对 bootstrap（约 5 分钟）；--scope all 为全集；--replot 只重画
+& $py scripts/train_router.py --dataset dota --img-weight 1.0 --ths 0.5 0.9          # DOTA 路由器（REPORT 3.17）
+& $py scripts/bootstrap_ci.py --dataset dota --th 0.5 --img-weight 1.0
 & $py app.py                                         # 交互 Demo，浏览器打开 http://127.0.0.1:7860
+& $py app.py --dataset dota                          # DOTA 版 Demo
 & $py scripts/illegal_parking.py --image datasets/VisDrone2019-DET-val/images/0000100_00504_d_0000004.jpg --auto-zone
 
 # ---- 受控实验：4K 稀疏画布（不需要 GPU / 检测器） ----
