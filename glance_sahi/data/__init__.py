@@ -19,6 +19,13 @@ DATASETS = {
         "coco_to_eval": dota.COCO_TO_EVAL,
         "max_dets": 2000,  # DOTA 单图目标可上千
     },
+    # 同一份 VisDrone val 与真值，配 scripts/train_visdrone.py 微调出的 2 类检测器（0 person，1 vehicle）
+    "visdrone_ft": {
+        "dir": ROOT / "datasets" / "VisDrone2019-DET-val",
+        "images": ROOT / "datasets" / "VisDrone2019-DET-val" / "images",
+        "coco_to_eval": {0: 1, 1: 2},
+        "max_dets": 500,
+    },
     # 同一份 DOTA val，但评全部 15 类，配 DOTA 上训练过的 OBB 检测器（yolo11s-obb.pt）使用。
     # 真值另存一个文件，不覆盖 COCO 检测器用的 3 类 coco_eval.json。
     "dota15": {
