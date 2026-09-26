@@ -147,7 +147,11 @@ def coco_eval(gt_path, dets, img_ids):
         ev.accumulate()
         ev.summarize()
     s = ev.stats
-    return dict(AP=s[0], AP50=s[1], AP75=s[2], APs=s[3], APm=s[4], APl=s[5])
+    # pycocotools 的 stats[0]（AP）固定按每图 100 个检测算，stats[1:] 才用 maxDets[2]。航拍图常超过 100 个目标，
+    # 所以 AP 也按 maxDets[2] 重算，与 AP50/AP_small 同口径（DOTA 上两者差约 7 点，VisDrone 约 0.1 点）
+    prec = ev.eval["precision"][:, :, :, 0, -1]
+    ap = float(prec[prec > -1].mean()) if (prec > -1).any() else -1.0
+    return dict(AP=ap, AP50=s[1], AP75=s[2], APs=s[3], APm=s[4], APl=s[5], AP_maxdet100=s[0])
 
 
 def merge(rec, sel, cfg):

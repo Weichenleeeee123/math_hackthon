@@ -9,7 +9,9 @@ __pycache__/
 # VisDrone-Sparse4K 受控实验画布：python scripts/sparsity_sweep.py --save
 datasets/
 *.pt
-weights/
+weights/*
+# 例外：VisDrone 微调检测器（19MB）直接随仓库分发，clone 下来即可复现 visdrone_ft 实验
+!weights/yolo11s-visdrone-ft.pt
 
 # ---- 评测缓存（可由 run_eval.py cache 重新生成） ----
 results/cache.pkl
