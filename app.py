@@ -36,9 +36,12 @@ PRESETS = {
 }
 DEFAULT = next(iter(PRESETS))
 
+_VD = ROOT / "datasets" / "VisDrone2019-DET-val" / "images"
 EXAMPLES = [
-    (ROOT / "datasets" / "VisDrone2019-DET-val" / "images" / "0000165_04325_d_0000105.jpg", DEFAULT),
-    (ROOT / "datasets" / "VisDrone2019-DET-val" / "images" / "0000001_04527_d_0000008.jpg", "VisDrone · 微调 YOLO11s"),
+    (_VD / "0000165_04325_d_0000105.jpg", DEFAULT),  # 成功案例：天空和楼宇被跳过
+    # 失败案例（REPORT 3.5）：斜视远景、低对比，扫视看不到就选不到；换微调检测器后盲区变小
+    (_VD / "0000001_04527_d_0000008.jpg", DEFAULT),
+    (_VD / "0000001_04527_d_0000008.jpg", "VisDrone · 微调 YOLO11s"),
     (ROOT / "datasets" / "DOTAv1" / "images" / "val" / "P0179.jpg", "DOTA · 官方 YOLO11s-OBB"),
 ]
 
