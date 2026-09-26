@@ -62,6 +62,22 @@ def test_identity_matches_coco_eval(tmp_path):
     assert got["APs"] == pytest.approx(ref["APs"], abs=1e-12)
 
 
+def test_ap_uses_max_dets_beyond_100(tmp_path):
+    """每图 > 100 个目标时，AP 必须按 maxDets[2] 算（pycocotools 的 stats[0] 会截在 100）。"""
+    images = [{"id": 1, "file_name": "a.jpg", "width": 2000, "height": 2000}]
+    anns, dets = [], []
+    for k in range(300):
+        x, y = (k % 20) * 90.0, (k // 20) * 90.0
+        anns.append({"id": k + 1, "image_id": 1, "category_id": 1, "bbox": [x, y, 30, 30], "area": 900, "iscrowd": 0})
+        dets.append({"image_id": 1, "category_id": 1, "bbox": [x, y, 30, 30], "score": 0.9 - k * 1e-3})
+    path = tmp_path / "many.json"
+    path.write_text(json.dumps({"images": images, "annotations": anns, "categories": [{"id": 1, "name": "a"}]}))
+    ref = R.coco_eval(path, dets, [1])
+    assert ref["AP"] > 0.99 and ref["AP_maxdet100"] < 0.5  # 截在 100 个框时只能召回三分之一
+    got = PreparedEval(_coco(path), dets, [1], R.DS["max_dets"]).ap()
+    assert got["AP"] == pytest.approx(ref["AP"], abs=1e-12)
+
+
 def test_resample_is_repeatable_and_order_free(tmp_path):
     path, ids, good, _ = _synthetic(tmp_path)
     pe = PreparedEval(_coco(path), good, ids, 500)
