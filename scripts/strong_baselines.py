@@ -127,26 +127,40 @@ def cmd_run(args):
     coco = json.loads(R.GT.read_text())
     images = coco["images"][: args.limit] if args.limit else coco["images"]
     model = build_model(args.weights, conf=cfg.output_conf, device=args.device, image_size=args.imgsz)
+    import torch
+
+    if torch.cuda.is_available():
+        # 显存上限：超过就抛 OOM 并记为"放不下"。否则 Windows 驱动会把溢出挪到内存里慢慢跑（慢约 10 倍），计时就没意义了
+        torch.cuda.set_per_process_memory_fraction(args.gpu_mem_frac)
+
+    def attempt(name, img):
+        try:
+            return run_one(name, img, model, cfg, args.imgsz, R.EXCLUDE) + (False,)
+        except torch.cuda.OutOfMemoryError:
+            model.image_size = args.imgsz
+            torch.cuda.empty_cache()
+            return [], float("nan"), 0, float("nan"), True
 
     # 预热：每个方法在前 3 张图上各跑一遍（每种新输入尺寸第一次都有 CUDA/cuDNN 一次性开销），不计时
     for im in images[:3]:
         img = R.load_rgb(R.IMAGES / im["file_name"])
         for name in names:
-            run_one(name, img, model, cfg, args.imgsz, R.EXCLUDE)
+            attempt(name, img)
 
     out = {"methods": names, "args": vars(args), "env": env_info(), "images": [],
            "dets": {n: [] for n in names}, "times": {n: [] for n in names}, "n_run": {n: [] for n in names},
-           "mpx": {n: [] for n in names}}
+           "mpx": {n: [] for n in names}, "oom": {n: [] for n in names}}
     for i, im in enumerate(tqdm(images, desc="strong")):
         img = R.load_rgb(R.IMAGES / im["file_name"])
         out["images"].append({"id": im["id"], "hw": img.shape[:2]})
         order = names[i % len(names):] + names[: i % len(names)]  # 轮换顺序，抵消"排第几个跑"的系统偏差
         for name in order:
-            preds, dt, n, mpx = run_one(name, img, model, cfg, args.imgsz, R.EXCLUDE)
+            preds, dt, n, mpx, oom = attempt(name, img)
             out["dets"][name].append(R.preds_to_np(preds))
             out["times"][name].append(dt)
             out["n_run"][name].append(n)
             out["mpx"][name].append(mpx)
+            out["oom"][name].append(oom)
     R.RES.mkdir(parents=True, exist_ok=True)
     path = R.RES / f"strong{args.tag}.pkl"
     path.write_bytes(pickle.dumps(out))
@@ -156,7 +170,7 @@ def cmd_run(args):
 def dominated_by(df, target, cost="time"):
     """按预注册规则，列出支配 target 的方法：ΔAP、ΔAP_small 的 95% 下界都 > −界，且
     cost="time"：耗时比 95% 上界 < 1（显著更快）；cost="mpx"：平均送检像素更少（算量，确定量，不需要区间）。"""
-    rows = df[(df.ref == target) & (df.method != target)]
+    rows = df[(df.ref == target) & (df.method != target) & (df.oom_imgs == 0)]  # 有图放不进显存的方法不算可行
     ok = (rows.dAP_lo > -NONINFERIORITY) & (rows.dAPs_lo > -NONINFERIORITY)
     if cost == "time":
         cheaper = rows.time_ratio_hi < 1
@@ -185,19 +199,23 @@ def cmd_eval(args):
     refs = [r for r in (target, base) if r in names]
     df = pd.DataFrame(paired_bootstrap(prepared, times, refs, args.boot, args.seed))
     df["slices_per_img"] = df.method.map({n: float(np.mean(data["n_run"][n])) for n in names})
-    df["mpx_per_img"] = df.method.map({n: float(np.mean(data["mpx"][n])) for n in names})
+    df["mpx_per_img"] = df.method.map({n: float(np.nanmean(data["mpx"][n])) for n in names})
+    # 放不进显存的图：该方法在这张图上没有输出（AP 按空检测算），耗时和像素按其余图平均，并单列张数
+    oom = data.get("oom", {n: [False] * len(ids) for n in names})
+    df["oom_imgs"] = df.method.map({n: int(np.sum(oom[n])) for n in names})
 
-    # 前沿：没有别的方法同时"更快且 AP 不低"（点估计）
-    pts = df[df.ref == refs[0]].set_index("method")
+    # 前沿：没有别的可行方法同时"更快且 AP 不低"（点估计）
+    pts = df[(df.ref == refs[0]) & (df.oom_imgs == 0)].set_index("method")
     for n in names:
-        faster = pts.ms_per_img < pts.at[n, "ms_per_img"]
-        better = pts.AP >= pts.at[n, "AP"]
-        df.loc[df.method == n, "on_frontier"] = not bool((faster & better).any())
+        row = df[(df.ref == refs[0]) & (df.method == n)].iloc[0]
+        faster = pts.ms_per_img < row.ms_per_img
+        better = pts.AP >= row.AP
+        df.loc[df.method == n, "on_frontier"] = row.oom_imgs == 0 and not bool((faster & better).any())
     out = R.RES / f"strong{args.tag}.csv"
     df.to_csv(out, index=False)
 
     cols = ["method", "slices_per_img", "mpx_per_img", "ms_per_img", "AP", "APs", "dAP", "dAP_lo", "dAP_hi",
-            "dAPs", "dAPs_lo", "dAPs_hi", "time_ratio", "time_ratio_lo", "time_ratio_hi", "on_frontier"]
+            "dAPs", "dAPs_lo", "dAPs_hi", "time_ratio", "time_ratio_lo", "time_ratio_hi", "oom_imgs", "on_frontier"]
     pd.set_option("display.width", 200)
     for ref in refs:
         print(f"\n== 相对 {ref}（ΔAP 为 AP 点；耗时比 = 方法 / {ref}；{args.boot} 次按图配对 bootstrap）")
@@ -262,6 +280,7 @@ if __name__ == "__main__":
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--tag", default="")
+    ap.add_argument("--gpu-mem-frac", type=float, default=0.85, help="显存上限比例；超过记为 OOM（放不下）")
     a = ap.parse_args()
     R.set_dataset(a.dataset)
     {"run": cmd_run, "eval": cmd_eval}[a.cmd](a)
