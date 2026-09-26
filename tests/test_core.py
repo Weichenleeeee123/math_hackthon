@@ -18,6 +18,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sahi.slicing import get_slice_bboxes, slice_image  # noqa: E402
 
 from glance_sahi import data as datasets  # noqa: E402
+from glance_sahi.active import (  # noqa: E402
+    active_select, calibrated_scores, estop_select, expected_missed, neighbor_weights,
+    observation_signal, refresh_scores, slice_centers,
+)
+from glance_sahi.calibration import (  # noqa: E402
+    DetectionCalibrator, expected_calibration_error, inside_any_box, match_to_gt, pava,
+)
 from glance_sahi.config import GlanceConfig  # noqa: E402
 from glance_sahi.data.dota import COCO_TO_EVAL as DOTA_COCO_TO_EVAL, DOTA_TO_EVAL  # noqa: E402
 from glance_sahi.data.visdrone import (  # noqa: E402
@@ -328,6 +335,183 @@ def test_prior_name_parsing():
         pass
     else:
         raise AssertionError("未知先验名应抛 ValueError")
+
+
+# --------------------------------------------------------------- 置信度分箱标定（REPORT 3.12）
+def test_pava_is_monotone_least_squares():
+    # 违反单调性的地方被合并成均值，得到单调不减的最小二乘拟合
+    assert np.allclose(pava(np.array([0.0, 1.0, 0.0, 1.0])), [0.0, 0.5, 0.5, 1.0])
+    assert np.allclose(pava(np.array([1.0, 0.0, 0.0])), [1 / 3] * 3)
+    assert np.allclose(pava(np.array([0.1, 0.2, 0.3])), [0.1, 0.2, 0.3]), "本来就单调 → 原样返回"
+    out = pava(np.array([0.9, 0.1, 0.8, 0.2, 0.3]))
+    assert (np.diff(out) >= -1e-12).all() and abs(out.mean() - 0.46) < 1e-9
+    assert pava(np.zeros(0)).shape == (0,)
+
+
+def test_ece_zero_when_perfectly_calibrated():
+    ece, rows = expected_calibration_error(np.full(4, 0.5), np.array([1.0, 0.0, 1.0, 0.0]))
+    assert ece == 0.0 and len(rows) == 1 and rows[0]["n"] == 4
+    # 说 0.9 但全错 → ECE 就是 0.9
+    ece_bad, _ = expected_calibration_error(np.full(10, 0.9), np.zeros(10))
+    assert abs(ece_bad - 0.9) < 1e-12
+    assert expected_calibration_error(np.zeros(0), np.zeros(0)) == (0.0, [])
+
+
+def test_calibrator_bins_by_apparent_size_and_is_monotone():
+    cal = DetectionCalibrator(min_bin=1)
+    # 表观尺度：同一目标在 4K 图上缩小得更多 → 箱更小
+    assert cal.scale_for((1080, 1920)) == 640 / 1920
+    assert abs(cal.apparent_size(np.array([[0, 0, 40, 40]], np.float32), 0.5)[0] - 20.0) < 1e-6
+    assert cal.bin_index(np.array([0.5, 3.0, 12.0, 1e9])).tolist() == [0, 1, 3, cal.n_bins - 1]
+
+    # 高置信度确实更可能是真目标：拟合出的映射必须单调不减、且落在 [0,1]
+    rng = np.random.default_rng(0)
+    c = rng.uniform(0, 0.5, 4000)
+    sizes = rng.uniform(1, 40, 4000)
+    lab = (c + 0.05 * rng.standard_normal(4000) > 0.2).astype(float)
+    cal.fit(sizes, c, lab)
+    p = cal.transform(np.tile([[0, 0, 20, 20]], (200, 1)).astype(np.float32),
+                      np.linspace(0, 0.5, 200).astype(np.float32), 1.0)
+    assert p.min() >= 0 and p.max() <= 1
+    assert (np.diff(p) >= -1e-9).all(), "同一箱内 p̂ 必须随 c 单调不减"
+    assert p[-1] > p[0] + 0.3, "c 大 → 标定概率应明显更高"
+
+
+def test_calibrator_falls_back_to_global_for_small_bins():
+    cal = DetectionCalibrator(bin_edges=[0, 4, 8, np.inf], min_bin=100)
+    cal.fit(np.array([6.0] * 500 + [100.0] * 3),          # 最后一箱只有 3 条
+            np.array([0.9] * 500 + [0.9] * 3),
+            np.array([1.0] * 500 + [0.0] * 3))
+    assert cal.counts == [0, 500, 3]
+    big = float(cal.transform(np.array([[0, 0, 6, 6]], np.float32), np.array([0.9]), 1.0)[0])
+    assert big > 0.99, "样本充足的箱用自己的映射（几乎全真阳 → 接近 1，被 clip 到 0.999）"
+    # 样本不足的箱回退到全局映射，全局被那 3 条负样本拉低
+    small = float(cal.transform(np.array([[0, 0, 100, 100]], np.float32), np.array([0.9]), 1.0)[0])
+    assert abs(small - float(np.interp(0.9, cal.grid, cal.global_map))) < 1e-12
+    assert small < big
+    assert cal.transform(np.zeros((0, 4), np.float32), np.zeros(0), 1.0).shape == (0,)
+
+
+def test_match_to_gt_and_inside_any_box():
+    gtc = np.array([[10.0, 10.0], [100.0, 100.0]])
+    gtd = np.array([8.0, 8.0])
+    det = np.array([[10.5, 10.0], [50.0, 50.0], [99.0, 101.0]])
+    assert match_to_gt(det, gtc, gtd, tol=2.0).tolist() == [True, False, True]
+    assert match_to_gt(det, np.zeros((0, 2)), np.zeros(0)).tolist() == [False, False, False]
+
+    crowd = np.array([[0, 0, 20, 20], [90, 90, 110, 110]], np.float32)
+    assert inside_any_box(det, crowd).tolist() == [True, False, True]
+    assert inside_any_box(det, np.zeros((0, 4))).tolist() == [False, False, False]
+
+
+def test_calibrator_roundtrip_through_disk(tmp_path=None):
+    import tempfile
+
+    cal = DetectionCalibrator().fit(np.array([5.0, 20.0] * 60),
+                                    np.array([0.1, 0.8] * 60),
+                                    np.array([0.0, 1.0] * 60))
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "cal.pkl"
+        cal.save(p)
+        back = DetectionCalibrator.load(p)
+    got, want = back.transform(np.array([[0, 0, 20, 20]], np.float32), np.array([0.5]), 1.0), \
+        cal.transform(np.array([[0, 0, 20, 20]], np.float32), np.array([0.5]), 1.0)
+    assert abs(float(got[0]) - float(want[0])) < 1e-12
+
+
+# --------------------------------------------------------------- 主动式两轮选片（REPORT 3.14）
+def _fake_rec(preds0=None):
+    """4 片排成一行；片 0 有一个强粗检（c=0.9），片 1/2 各一个很弱的（c=0.05），片 3 没有。"""
+    slices = [[0, 0, 100, 100], [100, 0, 200, 100], [200, 0, 300, 100], [300, 0, 400, 100]]
+    glance = np.array([[10, 10, 30, 30, 0.9, 0],
+                       [110, 10, 130, 30, 0.05, 0],
+                       [210, 10, 230, 30, 0.05, 0]], np.float32)
+    empty = np.zeros((0, 6), np.float32)
+    det = np.array([[110, 10, 130, 30, 0.8, 0]], np.float32)
+    p0 = det if preds0 is None else preds0
+    return dict(id=0, hw=(100, 400), slices=slices, glance=glance,
+                prior_edge=np.zeros(4, np.float32), slice_preds=[p0, empty, empty, empty])
+
+
+def test_neighbor_weights_and_centers():
+    c = slice_centers([[0, 0, 100, 100], [100, 0, 200, 100], [0, 100, 100, 200]])
+    assert np.allclose(c, [[50, 50], [150, 50], [50, 150]])
+    w = neighbor_weights(c, sigma=100.0)
+    assert np.allclose(w, w.T) and np.allclose(np.diag(w), 0.0), "对称、且不给自己投票"
+    assert abs(w[0, 1] - w[0, 2]) < 1e-12, "到片 1 与片 2 的距离相同（都是 100）→ 权重相同"
+    # 距离更远 → 权重更小
+    w2 = neighbor_weights(slice_centers([[0, 0, 100, 100], [100, 0, 200, 100], [50, 200, 150, 300]]),
+                          sigma=100.0)
+    assert w2[0, 1] > w2[0, 2], "近邻权重大于远邻"
+    far = neighbor_weights(slice_centers([[0, 0, 10, 10], [10 ** 5, 0, 10 ** 5 + 10, 10]]), 100.0)
+    assert far[0, 1] < 1e-6, "很远的片之间权重≈0"
+
+
+def test_observation_signal_and_refresh():
+    cfg = GlanceConfig()
+    # 片 0 检出非空 → +1；把片 1 设成"被选中却检空" → −1
+    rec = _fake_rec()
+    rec["slice_preds"][1] = np.zeros((0, 6), np.float32)
+    sig = observation_signal(rec, [0, 1])
+    assert sig.tolist() == [1.0, -1.0, 0.0, 0.0]
+
+    base = np.array([0.9, 0.5, 0.5, 0.5], np.float32)
+    up = refresh_scores(base, rec, [0], sigma=600.0, gamma=0.5)
+    assert up[1] > base[1], "邻居有检出 → 升温"
+    down = refresh_scores(base, {**rec, "slice_preds": [np.zeros((0, 6), np.float32)] + rec["slice_preds"][1:]},
+                          [0], sigma=600.0, gamma=0.5)
+    assert down[1] < base[1], "邻居被选中却检空 → 降温"
+    assert refresh_scores(base, rec, [], 600.0, 0.5).tolist() == base.tolist(), "没跑过任何片则不变"
+    out = refresh_scores(np.array([1.0, 1.0, 1.0, 1.0], np.float32), rec, [0], 600.0, 2.0)
+    assert out.max() <= 1.0 and out.min() >= 0.0, "修正后仍被 clip 到 [0,1]"
+
+
+def test_expected_missed_counts_unselected_posterior():
+    s_det = np.array([0.9, 0.5, 0.05, 0.0], np.float32)
+    assert abs(expected_missed(s_det, [0, 3]) - 0.55) < 1e-6   # float32 求和，容差放宽
+    assert abs(expected_missed(s_det, []) - 1.45) < 1e-6
+    assert expected_missed(s_det, [0, 1, 2, 3]) == 0.0
+
+
+def test_active_select_round1_budget_and_round2_gated():
+    cfg = GlanceConfig()
+    rec = _fake_rec()
+    base, _ = calibrated_scores(rec, cfg, None)
+    assert base[0] > 0.8 and base[1] > base[3], "片 0 最热、片 3 最冷"
+
+    # 预算 25% → 第 1 轮只跑 1 片；片 0 检出了 → 邻居升温，应追加（cap=50% 允许多加）
+    sel, info = active_select(rec, cfg, None, budget1=0.25, theta2=0.5, extra_frac=0.5,
+                              sigma=600.0, gamma=0.5)
+    assert info["round1"] == 1 and sel[0] == 0
+    assert info["round2_added"] >= 1, "正证据 + 过线 → 应该追加"
+    assert info["n_run"] == len(sel) and len(sel) <= 1 + int(round(0.5 * 4))
+    assert info["E_after"] <= info["E_round1"] + 1e-9, "多看几片只会让 E 变小"
+
+    # 门槛设得比升温后的分数还高 → 一片都不加（负证据时更明显）
+    sel2, info2 = active_select(rec, cfg, None, budget1=0.25, theta2=1.5, extra_frac=0.5)
+    assert info2["round2_added"] == 0 and len(sel2) == 1
+
+    # 片 0 被选中却检空 → 邻居降温，过不了 0.5 的门槛
+    empty0 = _fake_rec(preds0=np.zeros((0, 6), np.float32))
+    _, info3 = active_select(empty0, cfg, None, budget1=0.25, theta2=0.5, extra_frac=0.5)
+    assert info3["round2_added"] == 0, "空片是负证据，不应该把预算扩散到邻居"
+
+    # extra_frac 给不出余量（cap < 1）→ 直接停在第一轮
+    _, info4 = active_select(rec, cfg, None, budget1=0.25, theta2=0.5, extra_frac=0.1)
+    assert info4["round2_added"] == 0
+
+
+def test_estop_select_is_monotone_in_epsilon():
+    cfg = GlanceConfig()
+    rec = _fake_rec()
+    counts = [len(estop_select(rec, cfg, None, eps)[0]) for eps in (0.0, 0.05, 0.10, 1e9)]
+    # S_det = [0.9, 0.05, 0.05, 0]：ε=0 时把后验 >0 的 3 片跑完（第 4 片 S_det=0，跑它没有信息）
+    assert counts[0] == 3
+    assert counts == sorted(counts, reverse=True), "ε 越大越早停、跑得越少"
+    assert estop_select(rec, cfg, None, 1e9)[0].tolist() == [0], "ε 极大 → 至少仍跑一片"
+    # 每图预算自适应：E 停机给出的片数随 ε 单调
+    _, info = estop_select(rec, cfg, None, 0.05)
+    assert info["E_after"] <= 0.05 + 1e-9, "停机时未看区域的后验之和应已降到 ε 以下"
 
 
 if __name__ == "__main__":

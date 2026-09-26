@@ -12,6 +12,24 @@ SAHI 对整张图均匀切片、每片都跑一次检测器；Glance-SAHI 先把
 
 4K 受控实验（自造画布，只是机制验证、不含检测器，见报告 3.10）：目标只占 1.4% 面积时 **87.3% 的切片是空的**（SAHI 仍恒定切 60 片/图）。
 
+另外三节是**同预算**下的增强（3.12–3.14，仍零训练、离线可复现，各带 3 张新图）：
+- **3.12 标定**：把粗检置信度按表观尺度分箱、用保序回归标定成可当概率用的 p̂（留出集 ECE 0.51 → 0.03）。同预算下排序更准：50% 预算就能拿到 SAHI 全切 AP 的 98.8%。
+- **3.13 漏检归因**：小目标漏检 35.0 个点里，**34.2 个点是零训练检测器本身检不出**（任何切片都没用），选片只占 0.6 个点——继续优化选片的收益上限很小。
+- **3.14 主动选片**：两轮"边看边决定"在 VisDrone 上**没有可测收益**（与 3.13 的结论一致）；有价值的是新旋钮 **E 停机**（每图自适应预算，判据是概率量），在 ~83% 预算处比同预算的一次性选片高约 0.0013 AP。
+
+## 仓库里有什么 / 需要自己准备什么
+
+Git 里只放**代码、文档、评测 CSV 与报告图**；体积大、可重建的东西一律不进仓库（见 `.gitignore`）：
+
+| 不在仓库里 | 体积 | 为什么 | 怎么拿到 |
+|---|---|---|---|
+| `.venv/` | 约 4.9 GB | 其中 **PyTorch + CUDA 约 4.4 GB**，是本机运行环境；换机器重装即可 | 按下面「运行」一节重建（约几分钟，视网速） |
+| `datasets/` | 558 MB | 公开数据集，可重新下载 | `scripts/prepare_data.py`（VisDrone / DOTA）；4K 画布用 `scripts/sparsity_sweep.py --save` |
+| `yolo11s.pt` | 18 MB | 预训练权重 | 首次运行 Ultralytics 会自动下载 |
+| `results/**/cache.pkl` | ~200 MB | 切片级评测缓存 | `scripts/run_eval.py cache` 重新生成 |
+
+因此 **克隆后必须先装环境 + 准备数据**再跑评测；只有 `pytest tests` 不需要 GPU 和数据集。
+
 ## 目录
 
 ```
@@ -19,6 +37,8 @@ glance_sahi/          算法本体
   config.py           全部参数（切片网格、阈值、打分变体、绝对证据量 τ、融合权重）
   saliency.py         检测先验 S_det（noisy-OR / 4p(1−p) / 取最大 / 粗检热图）、图像先验 S_img、融合、证据量
   selector.py         阈值 θ / 固定预算 / 绝对证据量 τ 三种选片 + 随机对照 + 保底切片
+  calibration.py      按"表观尺度"分箱的保序回归（PAVA）标定：把 c_j 变成可当概率用的 p̂_j（REPORT 3.12）
+  active.py           主动式两轮选片 + 可计算的停机判据 E = Σ_{未跑} S_det（REPORT 3.14）
   rules.py            业务规则层（着地点 × 禁停多边形，纯几何可单测）
   predict.py          glance_sliced_prediction()：可直接替换 sahi.predict.get_sliced_prediction
   detector.py         SAHI 的 ultralytics 封装 + COCO→评测类别映射
@@ -32,14 +52,18 @@ scripts/
   visualize.py        三联图：SAHI 全切 | Glance 选中（未选压暗）| 粗检热图
   sparsity_sweep.py   受控实验：4K 稀疏画布上的“稀疏度 → 可省比例” + fig8（不需要 GPU）
   per_class.py        person / car / truck / bus 四类 AP（GT 与检测同时 remap）
+  attribute.py        漏检归因分解：检测器能力 vs 选片代价 vs 选中却漏 → fig10（REPORT 3.13）
+  active_eval.py      主动式两轮选片 + E 停机判据的曲线对比（离线，无需 GPU）→ fig11（REPORT 3.14）
+  calibrate.py        粗检测置信度的分箱标定：奇偶拆分拟合/留出，ECE + 同预算 AP 对比 → fig9（REPORT 3.12）
   illegal_parking.py  违停业务闭环示范（检测 → 规则层 → 标注图）
   stats.py            随机对照均值±方差、逐图切片比例统计
   coverage.py         与检测器无关的“目标覆盖率 vs 切片比例” + fig5
   lambda_check.py     图像先验权重 λ 的敏感性
   edge_vs_random.py   DOTA 上“仅边缘先验” vs 同数量随机选片
   pick_cases.py       挑选展示案例
-tests/test_core.py    单元测试（网格与 SAHI 一致、noisy-OR 累积弱证据、热图、打分变体、τ 选片、规则层、类别映射）
-results/              VisDrone 的 CSV、图、可视化
+tests/test_core.py    单元测试 28 项（网格与 SAHI 一致、noisy-OR 累积弱证据、热图、打分变体、τ/θ/E 选片、
+                      规则层、类别映射、分箱标定 PAVA/ECE、主动选片的观测扩散与停机判据）
+results/              VisDrone 的 CSV、图、可视化（含 3.12–3.14 的 calibration/calib_*/attribution/active_* 与 fig9–fig11）
 results/dota/         DOTA 的 CSV、图、可视化
 results/legacy_saliency_sahi/  参照实现归档的 v0→v1 诊断数据（slice_gain.csv 等，见 REPORT 3.8）
 datasets/VisDrone-Sparse4K/    受控实验画布（sparsity_sweep.py --save 生成，可当 --dataset sparse4k 评测）
@@ -66,6 +90,9 @@ $py = ".\.venv\Scripts\python.exe"
 & $py scripts/coverage.py visdrone
 & $py scripts/run_eval.py buckets --op 0.9            # 按目标数分桶的精度 → results/buckets.csv
 & $py scripts/per_class.py --op 0.9                   # 四类细分 AP → results/per_class.csv
+& $py scripts/calibrate.py                           # 粗检测置信度分箱标定（奇偶拆分，离线，无需 GPU）→ calibration.csv / calib_*.csv / figures/fig9_calibration.png
+& $py scripts/attribute.py                           # 漏检归因：选片代价 vs 检测器能力（离线，无需 GPU）→ attribution.csv / figures/fig10_attribution.png
+& $py scripts/active_eval.py                         # 主动式两轮选片 + E 停机判据（离线，无需 GPU）→ active_holdout.csv / active_E.csv / figures/fig11_active.png
 & $py scripts/illegal_parking.py --image datasets/VisDrone2019-DET-val/images/0000100_00504_d_0000004.jpg --auto-zone
 
 # ---- 受控实验：4K 稀疏画布（不需要 GPU / 检测器） ----

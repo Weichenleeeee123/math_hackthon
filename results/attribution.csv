@@ -1,0 +1,7 @@
+method,subset,n_gt,hit,miss_detector,miss_selection,miss_selected
+sahi_uniform,all,31009,23093,7865,0,51
+sahi_uniform,small,20620,13513,7060,0,47
+glance@0.9,all,31009,22896,7866,193,54
+glance@0.9,small,20620,13385,7061,124,50
+glance@0.99,all,31009,22536,7863,559,51
+glance@0.99,small,20620,13123,7058,392,47
