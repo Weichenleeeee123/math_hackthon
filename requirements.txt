@@ -8,3 +8,4 @@ matplotlib
 pandas
 tqdm
 pytest
+gradio        # 只有现场 Demo（app.py）需要

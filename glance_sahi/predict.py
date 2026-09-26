@@ -30,6 +30,7 @@ class GlanceStats:
     slices: list = field(default_factory=list)
     evidence: np.ndarray | None = None   # 每片的绝对证据量（mode="evidence" 用）
     heat: np.ndarray | None = None       # det_prior="heatmap" 时的缩略图热图（可视化用）
+    glance_boxes: np.ndarray | None = None  # 扫视阶段的弱检测 (x1, y1, x2, y2, conf)，可视化用
     t_glance: float = 0.0     # 整图缩小推理
     t_saliency: float = 0.0   # 打分 + 选片
     t_slices: float = 0.0     # 切片推理
@@ -101,6 +102,7 @@ def glance_sliced_prediction(
             s_img = region_prior(sal, scale, slices)
         scores = fuse(s_det, s_img, cfg.img_weight)
         st.evidence = evidence_mass(boxes, confs, slices)
+        st.glance_boxes = np.hstack([boxes, confs[:, None]])
         sel = select_slices(scores, cfg.mode, cfg.threshold, cfg.budget,
                             st.evidence, cfg.tau, cfg.min_slices)
         if random_k_rng is not None:

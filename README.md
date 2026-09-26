@@ -117,6 +117,16 @@ $py = ".\.venv\Scripts\python.exe"
 先想小规模试跑，给 `cache` / `e2e` 加 `--limit 50`；`sim` 现在跑全量要 100 多次 COCO 评测（约 1 小时以上），
 只想看某个变体时用 `--only uncertain,heatmap --no-random`（`sim` 也支持 `--limit`，但它会落在缓存的前 N 张上，数字会更噪，别用来出报告）。
 
+## 现场 Demo
+
+```powershell
+& $py -m pip install gradio
+& $py app.py        # 浏览器打开 http://127.0.0.1:7860
+```
+
+上传一张图（或点示例），同屏对比 SAHI 全切和 Glance-SAHI 选片：切片数、检测框数、单图耗时，外加每片的扫视打分 S(k)。
+可切换三种检测器预设（COCO 零训练 / VisDrone 微调 / DOTA 官方 OBB），θ、λ 可拖动。耗时是本机单次实测，每种图像尺寸第一次运行前会先完整预热一遍。
+
 ## 在自己的代码里使用
 
 ```python
