@@ -1,0 +1,24 @@
+# ---- 虚拟环境与 Python 缓存（体积大、可重建） ----
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# ---- 数据集与模型权重（体积大，脚本可重新下载/生成） ----
+# VisDrone / DOTA：python scripts/prepare_data.py [--dataset dota]
+# VisDrone-Sparse4K 受控实验画布：python scripts/sparsity_sweep.py --save
+datasets/
+*.pt
+weights/
+
+# ---- 评测缓存（可由 run_eval.py cache 重新生成） ----
+results/cache.pkl
+results/*/cache.pkl
+results/*/det_cache.pkl
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+~$*

@@ -1,0 +1,10 @@
+# torch 需按 CUDA 版本单独安装：
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+ultralytics>=8.3
+sahi==0.12.7
+opencv-python
+pycocotools
+matplotlib
+pandas
+tqdm
+pytest
