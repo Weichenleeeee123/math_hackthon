@@ -8,7 +8,7 @@
 - 从 `yolo11s.pt`（COCO）出发，imgsz 640，batch 16，时间预算 1.2 小时，实际训练 29 个 epoch，用时 72 分钟。
 - 数据加载进程用 2 个。第一次用 4 个时，系统内存提交额度耗尽，崩溃了：C 盘只剩约 300MB，页面文件无法扩展。
 - mini-val 上 mAP50-95 为 0.390（person 0.227，vehicle 0.554）。这组样本混合了整图和裁块，不能和下面 val 上的 COCO AP 直接比较。
-- 权重：`weights/yolo11s-visdrone-ft.pt`（已忽略，不进 git）。
+- 权重：`weights/yolo11s-visdrone-ft.pt`，已随仓库提交（affaf12，19MB），同一文件也在 fork 的 Release `visdrone-ft-v1`。
 
 ## 实测 1：强基线速度-精度前沿
 
