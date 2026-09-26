@@ -88,27 +88,30 @@ def _label(canvas, text):
     cv2.putText(canvas, text, (8, 21), cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 1, cv2.LINE_AA)
 
 
-def draw_sahi(img, slices, preds):
+def draw_sahi(img, slices, preds, label=True):
     c, s = _scaled(img)
     for b in slices:
         _rect(c, b, s, ORANGE, 1, inset=2)
     _dets(c, preds, s)
-    _label(c, f"SAHI: {len(slices)}/{len(slices)} slices")
+    if label:
+        _label(c, f"SAHI: {len(slices)}/{len(slices)} slices")
     return c
 
 
-def draw_glance(img, st, preds):
+def draw_glance(img, st, preds, label=True):
     c, s = _scaled(img)
     sel = set(int(k) for k in st.selected)
-    for k, b in enumerate(st.slices):  # 未推理的切片压暗：一眼看出跳过了什么
-        if k not in sel:
-            x1, y1, x2, y2 = (int(round(v * s)) for v in b)
-            sub = c[y1:y2, x1:x2]
-            sub[:] = (sub * 0.4 + 40).astype(np.uint8)
+    # 没被任何选中切片覆盖的像素压暗一次：一眼看出跳过了什么（切片有重叠，逐片压暗会出现深色条纹）
+    covered = np.zeros(c.shape[:2], bool)
+    for k in sel:
+        x1, y1, x2, y2 = (int(round(v * s)) for v in st.slices[k])
+        covered[y1:y2, x1:x2] = True
+    c[~covered] = (c[~covered] * 0.4 + 40).astype(np.uint8)
     for k in sel:
         _rect(c, st.slices[k], s, ORANGE, 3, inset=2)
     _dets(c, preds, s)
-    _label(c, f"Glance-SAHI: {len(sel)}/{st.n_slices_total} slices")
+    if label:
+        _label(c, f"Glance-SAHI: {len(sel)}/{st.n_slices_total} slices")
     return c
 
 
