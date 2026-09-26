@@ -149,7 +149,9 @@ def heatmap_prior(boxes: np.ndarray, scores: np.ndarray, hw: tuple[int, int], sl
         yb = min(max(int(np.ceil(y2 * scale)), ya + 1), th)
         xb = min(max(int(np.ceil(x2 * scale)), xa + 1), tw)
         mass[k] = float(raw[ya:yb, xa:xb].sum())
-    return 1.0 - np.exp(-mass), coarse_heatmap((th, tw), b, scores, sigma, normalize=True), scale
+    # 显示用热图 = 同一张 raw 按最大值归一（与 coarse_heatmap(normalize=True) 逐位一致），不必再模糊一遍
+    m = float(raw.max())
+    return 1.0 - np.exp(-mass), (raw / m if m > 0 else raw), scale
 
 
 def region_prior(sal: np.ndarray, scale: float, slices: list[list[int]]) -> np.ndarray:

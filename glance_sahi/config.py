@@ -35,3 +35,10 @@ class GlanceConfig:
     budget: float = 0.5         # mode="budget" 时保留分数最高的比例
     tau: float = 1.0            # mode="evidence"：片内证据量（弱检测置信度之和）≥ τ 才细看，绝对值可跨图标定
     min_slices: int = 0         # 保底切片数：不足时按分数补齐（0=关闭；evidence 模式自动至少 1）
+
+    # --- 打分器（路由器）---
+    #   "fusion"  手工稀疏门：S = 1 − (1 − S_det)(1 − λ·S_img)（默认，零训练）
+    #   "learned" 可学习稀疏路由器 g_φ(x_k)：小 MLP，吃同样的扫视证据（REPORT 3.15，scripts/train_router.py）
+    scorer: str = "fusion"
+    router_path: str = "results/router.json"
+    router_threshold: float | None = None   # learned + threshold 模式的门限；None = 用 router.json 里的默认工作点

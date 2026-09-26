@@ -47,7 +47,7 @@ def main():
     ap.add_argument("--op", type=float, default=0.9)
     ap.add_argument("--img-weight", type=float, default=0.3)
     ap.add_argument("--weights", default="yolo11s.pt")
-    ap.add_argument("--device", default="cuda:0")
+    ap.add_argument("--device", default="auto")
     ap.add_argument("--out", default=str(ROOT / "results" / "vis"))
     a = ap.parse_args()
 

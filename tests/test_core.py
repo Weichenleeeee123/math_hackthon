@@ -255,6 +255,11 @@ def test_coarse_heatmap_conserves_mass_and_is_soft():
     hard = detection_prior(edge, sc, slices, 0)
     assert hard[0] == 0.0 and hard[1] > 0, "硬边界（margin=0）：只有一片拿得到"
 
+    # 显示用热图复用选片那一次卷积，必须与单独归一化的热图逐位一致
+    _, disp, s = heatmap_prior(boxes, np.full(8, 0.1, np.float32), shape, slices, map_size=64, sigma=6.0)
+    ref = coarse_heatmap(shape, boxes * s, np.full(8, 0.1, np.float32), 6.0, normalize=True)
+    assert np.array_equal(disp, ref)
+
 
 def test_heatmap_prior_matches_noisy_or_when_sparse():
     slices = [[0, 0, 256, 256], [256, 0, 512, 256]]

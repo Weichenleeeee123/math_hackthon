@@ -17,6 +17,7 @@ from sahi.prediction import PredictionResult
 from sahi.slicing import get_slice_bboxes
 
 from .config import GlanceConfig
+from .router import load_router, slice_features
 from .saliency import detection_prior, evidence_mass, fuse, heatmap_prior, image_prior_map, region_prior
 from .selector import random_slices, select_slices
 
@@ -59,6 +60,37 @@ def _predict_slices(image, model, slices, idx, exclude_ids):
     return preds
 
 
+def score_slices(image: np.ndarray, glance_np: np.ndarray, slices: list, cfg: GlanceConfig):
+    """每个切片的路由分数。返回 (scores, evidence, heat)。
+
+    scorer="fusion"：手工稀疏门（与原实现逐位一致）；
+    scorer="learned"：可学习路由器 g_φ(x_k)，特征与离线训练同一路径（router.slice_features）。
+    """
+    h, w = image.shape[:2]
+    boxes, confs = glance_np[:, :4], glance_np[:, 4]
+    evidence = evidence_mass(boxes, confs, slices)
+    heat = None
+    if cfg.scorer == "learned":
+        router = load_router(cfg.router_path)
+        # 特征里的 "fused" 依赖 λ：必须用训练时的 λ（存在 router.json 里），否则输入分布与训练不一致
+        rcfg = replace(cfg, img_weight=float(router.meta.get("img_weight", cfg.img_weight)))
+        sal, scale = image_prior_map(image, "edge", cfg.img_map_size)
+        prior_edge = region_prior(sal, scale, slices)
+        X = slice_features(glance_np, (h, w), slices, prior_edge, rcfg)
+        return router.predict_proba(X), evidence, heat
+    if cfg.scorer != "fusion":
+        raise ValueError(cfg.scorer)
+    if cfg.det_prior == "heatmap":
+        s_det, heat, _ = heatmap_prior(boxes, confs, (h, w), slices, cfg.img_map_size, cfg.heat_sigma)
+    else:
+        s_det = detection_prior(boxes, confs, slices, cfg.det_margin, cfg.det_prior)
+    s_img = None
+    if cfg.img_prior != "none" and cfg.img_weight > 0:
+        sal, scale = image_prior_map(image, cfg.img_prior, cfg.img_map_size)
+        s_img = region_prior(sal, scale, slices)
+    return fuse(s_det, s_img, cfg.img_weight), evidence, heat
+
+
 def glance_sliced_prediction(
     image: np.ndarray,
     model,
@@ -83,26 +115,23 @@ def glance_sliced_prediction(
                             confidence_threshold=cfg.glance_conf).object_prediction_list
     st.t_glance = time.perf_counter() - t0
 
-    # 2) 打分 + 选片
+    # 2) 打分 + 选片（路由）
     t0 = time.perf_counter()
     if force_select is not None:
         sel = np.asarray(force_select, dtype=int)
         scores = np.ones(len(slices), dtype=np.float32)
     else:
-        boxes = np.array([p.bbox.to_xyxy() for p in glance], dtype=np.float32).reshape(-1, 4)
-        confs = np.array([p.score.value for p in glance], dtype=np.float32)
-        if cfg.det_prior == "heatmap":
-            s_det, st.heat, _ = heatmap_prior(boxes, confs, (h, w), slices, cfg.img_map_size, cfg.heat_sigma)
+        glance_np = np.array([p.bbox.to_xyxy() + [p.score.value, p.category.id] for p in glance],
+                             dtype=np.float32).reshape(-1, 6)
+        scores, st.evidence, st.heat = score_slices(image, glance_np, slices, cfg)
+        if cfg.scorer == "learned":
+            thr = cfg.router_threshold if cfg.router_threshold is not None \
+                else load_router(cfg.router_path).default_threshold
+            sel = select_slices(scores, "budget" if cfg.mode == "budget" else "threshold", thr, cfg.budget,
+                                min_slices=cfg.min_slices)
         else:
-            s_det = detection_prior(boxes, confs, slices, cfg.det_margin, cfg.det_prior)
-        s_img = None
-        if cfg.img_prior != "none" and cfg.img_weight > 0:
-            sal, scale = image_prior_map(image, cfg.img_prior, cfg.img_map_size)
-            s_img = region_prior(sal, scale, slices)
-        scores = fuse(s_det, s_img, cfg.img_weight)
-        st.evidence = evidence_mass(boxes, confs, slices)
-        sel = select_slices(scores, cfg.mode, cfg.threshold, cfg.budget,
-                            st.evidence, cfg.tau, cfg.min_slices)
+            sel = select_slices(scores, cfg.mode, cfg.threshold, cfg.budget,
+                                st.evidence, cfg.tau, cfg.min_slices)
         if random_k_rng is not None:
             sel = random_slices(len(slices), len(sel), random_k_rng)
     st.slice_scores, st.selected, st.n_slices_run = scores, sel, len(sel)

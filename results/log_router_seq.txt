@@ -1,0 +1,89 @@
+﻿[sequence] 训练 275 图 / 留出 273 图，标签=gain
+特征 22 维；训练切片 2098（正例率 0.585），留出切片 2177；3.0s
+  cv hidden=  0 alpha=0.0    PR-AUC=0.8873 ± 0.0154
+  cv hidden=  0 alpha=0.01   PR-AUC=0.8872 ± 0.0155
+  cv hidden=  0 alpha=0.1    PR-AUC=0.8863 ± 0.0157
+  cv hidden= 16 alpha=0.0    PR-AUC=0.8763 ± 0.0122
+  cv hidden= 16 alpha=0.01   PR-AUC=0.8760 ± 0.0088
+  cv hidden= 16 alpha=0.1    PR-AUC=0.8761 ± 0.0083
+  cv hidden= 32 alpha=0.0    PR-AUC=0.8463 ± 0.0231
+  cv hidden= 32 alpha=0.01   PR-AUC=0.8446 ± 0.0249
+  cv hidden= 32 alpha=0.1    PR-AUC=0.8383 ± 0.0210
+选中 hidden=0 alpha=0.0
+训练 5 个种子用时 1.1s，参数量 23/成员
+  fusion(det+edge)       AUC=0.7347 PR-AUC=0.7460 ECE=0.3420
+  det_noisyor            AUC=0.7339 PR-AUC=0.7454 ECE=0.3215
+  router                 AUC=0.8516 PR-AUC=0.8648 ECE=0.0630
+最重要的 6 个特征： log_n_weak(0.049), cy(0.021), log_app_size(0.021), mass_other(0.020), log_n_strong(0.018), border(0.013)
+full_image                         AP=0.2066 APs=0.0906 slices=0.0% cov_small=0.000
+sahi_uniform                       AP=0.2926 APs=0.1761 slices=100.0% cov_small=1.000
+oracle_gt_small                    AP=0.2942 APs=0.1787 slices=75.2% cov_small=1.000
+fusion_thr@0.9                     AP=0.2921 APs=0.1751 slices=80.2% cov_small=0.980
+router_matched@0.9                 AP=0.2915 APs=0.1749 slices=80.2% cov_small=0.984
+fusion_thr@0.99                    AP=0.2879 APs=0.1733 slices=65.0% cov_small=0.954
+router_matched@0.99                AP=0.2880 APs=0.1731 slices=65.0% cov_small=0.950
+router_global@op                   AP=0.2941 APs=0.1770 slices=78.5% cov_small=0.993
+fusion_budget@0.3                  AP=0.2581 APs=0.1472 slices=26.6% cov_small=0.676
+router_topk@0.3                    AP=0.2705 APs=0.1655 slices=26.6% cov_small=0.755
+router_global@0.3                  AP=0.2854 APs=0.1757 slices=37.1% cov_small=0.891
+random_budget@0.3#s0               AP=0.2431 APs=0.1306 slices=26.6% cov_small=0.526
+random_budget@0.3#s1               AP=0.2370 APs=0.1274 slices=26.6% cov_small=0.477
+random_budget@0.3#s2               AP=0.2369 APs=0.1265 slices=26.6% cov_small=0.490
+fusion_budget@0.4                  AP=0.2674 APs=0.1535 slices=37.1% cov_small=0.768
+router_topk@0.4                    AP=0.2800 APs=0.1733 slices=37.1% cov_small=0.846
+router_global@0.4                  AP=0.2910 APs=0.1806 slices=46.3% cov_small=0.940
+random_budget@0.4#s0               AP=0.2530 APs=0.1401 slices=37.1% cov_small=0.634
+random_budget@0.4#s1               AP=0.2480 APs=0.1370 slices=37.1% cov_small=0.595
+random_budget@0.4#s2               AP=0.2492 APs=0.1379 slices=37.1% cov_small=0.603
+fusion_budget@0.5                  AP=0.2791 APs=0.1647 slices=50.4% cov_small=0.861
+router_topk@0.5                    AP=0.2891 APs=0.1763 slices=50.4% cov_small=0.937
+router_global@0.5                  AP=0.2939 APs=0.1790 slices=56.2% cov_small=0.963
+random_budget@0.5#s0               AP=0.2697 APs=0.1566 slices=50.4% cov_small=0.786
+random_budget@0.5#s1               AP=0.2614 APs=0.1496 slices=50.4% cov_small=0.726
+random_budget@0.5#s2               AP=0.2608 APs=0.1488 slices=50.4% cov_small=0.713
+fusion_budget@0.6                  AP=0.2843 APs=0.1714 slices=62.9% cov_small=0.923
+router_topk@0.6                    AP=0.2916 APs=0.1776 slices=62.9% cov_small=0.963
+router_global@0.6                  AP=0.2949 APs=0.1790 slices=63.1% cov_small=0.980
+random_budget@0.6#s0               AP=0.2775 APs=0.1642 slices=62.9% cov_small=0.858
+random_budget@0.6#s1               AP=0.2725 APs=0.1587 slices=62.9% cov_small=0.837
+random_budget@0.6#s2               AP=0.2730 APs=0.1597 slices=62.9% cov_small=0.830
+fusion_budget@0.7                  AP=0.2881 APs=0.1737 slices=72.6% cov_small=0.953
+router_topk@0.7                    AP=0.2923 APs=0.1769 slices=72.6% cov_small=0.974
+router_global@0.7                  AP=0.2944 APs=0.1770 slices=71.9% cov_small=0.986
+random_budget@0.7#s0               AP=0.2818 APs=0.1682 slices=72.6% cov_small=0.909
+random_budget@0.7#s1               AP=0.2785 APs=0.1636 slices=72.6% cov_small=0.896
+random_budget@0.7#s2               AP=0.2794 APs=0.1650 slices=72.6% cov_small=0.895
+fusion_budget@0.8                  AP=0.2891 APs=0.1738 slices=77.0% cov_small=0.967
+router_topk@0.8                    AP=0.2923 APs=0.1769 slices=77.0% cov_small=0.986
+router_global@0.8                  AP=0.2940 APs=0.1770 slices=80.4% cov_small=0.994
+random_budget@0.8#s0               AP=0.2829 APs=0.1694 slices=77.0% cov_small=0.915
+random_budget@0.8#s1               AP=0.2791 APs=0.1634 slices=77.0% cov_small=0.898
+random_budget@0.8#s2               AP=0.2803 APs=0.1655 slices=77.0% cov_small=0.902
+fusion_budget@0.9                  AP=0.2926 APs=0.1760 slices=87.5% cov_small=0.997
+router_topk@0.9                    AP=0.2928 APs=0.1764 slices=87.5% cov_small=0.996
+router_global@0.9                  AP=0.2929 APs=0.1759 slices=90.6% cov_small=1.000
+random_budget@0.9#s0               AP=0.2895 APs=0.1739 slices=87.5% cov_small=0.976
+random_budget@0.9#s1               AP=0.2863 APs=0.1683 slices=87.5% cov_small=0.955
+random_budget@0.9#s2               AP=0.2859 APs=0.1712 slices=87.5% cov_small=0.953
+            method  slice_frac  rate_mean  rate_std  rate_gini  spearman_rate_ngt
+      sahi_uniform    1.000000   1.000000  0.000000   0.000000                NaN
+    fusion_thr@0.9    0.802021   0.835928  0.262032   0.146281           0.313405
+router_matched@0.9    0.802021   0.835928  0.262032   0.146281           0.313405
+  router_global@op    0.785485   0.813248  0.265730   0.159973           0.347892
+ fusion_budget@0.3    0.266422   0.270269  0.034771   0.056563          -0.293028
+ fusion_budget@0.4    0.370694   0.366941  0.019355   0.024135           0.249595
+ fusion_budget@0.5    0.503904   0.502076  0.008055   0.003877          -0.011926
+ fusion_budget@0.6    0.629306   0.633059  0.019355   0.013990          -0.249595
+ fusion_budget@0.7    0.725769   0.725580  0.037930   0.023793           0.280387
+ fusion_budget@0.8    0.770326   0.772344  0.035482   0.021073          -0.293028
+ fusion_budget@0.9    0.874598   0.869017  0.024015   0.012431           0.249595
+ router_global@0.3    0.370694   0.406838  0.354043   0.483409           0.448135
+ router_global@0.4    0.463482   0.499939  0.351658   0.399643           0.419681
+ router_global@0.5    0.561782   0.598748  0.337733   0.319418           0.383248
+ router_global@0.6    0.631144   0.665415  0.320539   0.267604           0.394333
+ router_global@0.7    0.719339   0.749817  0.289654   0.204677           0.390327
+ router_global@0.8    0.804318   0.830739  0.255490   0.146458           0.336060
+ router_global@0.9    0.906293   0.921276  0.194286   0.074042           0.352245
+写出 C:\Users\31392\Desktop\数学建模\results\router_seq.json（默认全局阈值 μ=0.3014，训练激活率 ρ=0.777）
+写出 C:\Users\31392\Desktop\数学建模\results\figures\fig12_router_seq.png
+写出 C:\Users\31392\Desktop\数学建模\results\figures\fig14_router_sparsity_seq.png

@@ -8,3 +8,6 @@ matplotlib
 pandas
 tqdm
 pytest
+# 交互 Demo（app.py）
+gradio>=4.44,<6
+# 注：可学习路由器训练（scripts/train_router.py）需 torch>=2.1；推理只用 numpy（权重存为 results/router.json）

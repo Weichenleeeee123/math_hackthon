@@ -1,0 +1,119 @@
+scope=holdout：274 图，B=1000
+  full_image                 AP=0.2014 APs=0.0961 slices=0.0% (15.0s)
+  sahi_uniform               AP=0.2852 APs=0.1811 slices=100.0% (12.8s)
+  fusion_thr@0.9             AP=0.2837 APs=0.1797 slices=79.2% (13.1s)
+  oracle_gt_small            AP=0.2863 APs=0.1839 slices=77.3% (12.2s)
+  random_matched@0.9#s0      AP=0.2764 APs=0.1731 slices=79.2% (12.4s)
+  random_matched@0.9#s1      AP=0.2780 APs=0.1740 slices=79.2% (12.2s)
+  random_matched@0.9#s2      AP=0.2780 APs=0.1733 slices=79.2% (12.4s)
+  router_matched@0.9         AP=0.2838 APs=0.1804 slices=79.2% (12.6s)
+  router_global@op           AP=0.2860 APs=0.1810 slices=79.0% (12.3s)
+  router_global@0.5          AP=0.2854 APs=0.1854 slices=50.1% (11.5s)
+  fusion_budget@0.5          AP=0.2721 APs=0.1701 slices=50.2% (10.8s)
+  random_budget@0.5#s0       AP=0.2572 APs=0.1550 slices=50.2% (10.4s)
+  random_budget@0.5#s1       AP=0.2583 APs=0.1565 slices=50.2% (10.6s)
+  random_budget@0.5#s2       AP=0.2595 APs=0.1561 slices=50.2% (10.8s)
+bootstrap 1000 次用时 213.9s
+            method area       AP       lo       hi       se  slice_frac
+        full_image  all 0.201420 0.188681 0.213715 0.006607    0.000000
+      sahi_uniform  all 0.285198 0.270980 0.300094 0.007667    1.000000
+    fusion_thr@0.9  all 0.283664 0.269547 0.298577 0.007703    0.791783
+   oracle_gt_small  all 0.286295 0.272545 0.301179 0.007615    0.772642
+router_matched@0.9  all 0.283768 0.269280 0.298365 0.007698    0.791783
+  router_global@op  all 0.285972 0.271818 0.301122 0.007710    0.790383
+ router_global@0.5  all 0.285365 0.271394 0.300543 0.007785    0.500934
+ fusion_budget@0.5  all 0.272066 0.257069 0.286171 0.007576    0.502334
+random_matched@0.9  all 0.277450 0.263413 0.292466 0.007624    0.791783
+ random_budget@0.5  all 0.258346 0.245523 0.271741 0.006813    0.502334
+            method                 vs  area     delta        lo        hi  p_le0
+        full_image       sahi_uniform   all -0.083778 -0.090982 -0.077743  1.000
+        full_image       sahi_uniform small -0.085035 -0.093351 -0.078512  1.000
+        full_image random_matched@0.9   all -0.076030 -0.082896 -0.069962  1.000
+        full_image random_matched@0.9 small -0.077399 -0.085879 -0.071476  1.000
+        full_image     fusion_thr@0.9   all -0.082244 -0.089461 -0.075862  1.000
+        full_image     fusion_thr@0.9 small -0.083633 -0.092330 -0.077321  1.000
+        full_image  fusion_budget@0.5   all -0.070646 -0.077041 -0.063930  1.000
+        full_image  fusion_budget@0.5 small -0.074011 -0.083130 -0.067592  1.000
+        full_image  random_budget@0.5   all -0.056926 -0.063016 -0.052516  1.000
+        full_image  random_budget@0.5 small -0.059819 -0.067006 -0.054777  1.000
+      sahi_uniform random_matched@0.9   all  0.007748  0.004961  0.010538  0.000
+      sahi_uniform random_matched@0.9 small  0.007636  0.004311  0.010679  0.000
+      sahi_uniform     fusion_thr@0.9   all  0.001534  0.000334  0.002962  0.004
+      sahi_uniform     fusion_thr@0.9 small  0.001402 -0.000222  0.002369  0.063
+      sahi_uniform  fusion_budget@0.5   all  0.013132  0.010055  0.017190  0.000
+      sahi_uniform  fusion_budget@0.5 small  0.011025  0.005431  0.015593  0.000
+      sahi_uniform  random_budget@0.5   all  0.026852  0.023275  0.030467  0.000
+      sahi_uniform  random_budget@0.5 small  0.025216  0.021193  0.029345  0.000
+    fusion_thr@0.9       sahi_uniform   all -0.001534 -0.002962 -0.000334  0.996
+    fusion_thr@0.9       sahi_uniform small -0.001402 -0.002369  0.000222  0.937
+    fusion_thr@0.9 random_matched@0.9   all  0.006214  0.003691  0.008525  0.000
+    fusion_thr@0.9 random_matched@0.9 small  0.006234  0.003493  0.009424  0.000
+    fusion_thr@0.9  fusion_budget@0.5   all  0.011598  0.008406  0.015998  0.000
+    fusion_thr@0.9  fusion_budget@0.5 small  0.009623  0.004397  0.014623  0.001
+    fusion_thr@0.9  random_budget@0.5   all  0.025318  0.021623  0.028829  0.000
+    fusion_thr@0.9  random_budget@0.5 small  0.023814  0.019819  0.028618  0.000
+   oracle_gt_small       sahi_uniform   all  0.001097 -0.000212  0.003247  0.042
+   oracle_gt_small       sahi_uniform small  0.002826  0.001959  0.003991  0.000
+   oracle_gt_small random_matched@0.9   all  0.008845  0.006149  0.012601  0.000
+   oracle_gt_small random_matched@0.9 small  0.010462  0.006916  0.013866  0.000
+   oracle_gt_small     fusion_thr@0.9   all  0.002631  0.001127  0.005260  0.001
+   oracle_gt_small     fusion_thr@0.9 small  0.004228  0.002281  0.005678  0.000
+   oracle_gt_small  fusion_budget@0.5   all  0.014229  0.011451  0.018985  0.000
+   oracle_gt_small  fusion_budget@0.5 small  0.013851  0.008172  0.018448  0.000
+   oracle_gt_small  random_budget@0.5   all  0.027949  0.024818  0.032001  0.000
+   oracle_gt_small  random_budget@0.5 small  0.028042  0.023972  0.032389  0.000
+router_matched@0.9       sahi_uniform   all -0.001430 -0.003285 -0.000406  0.999
+router_matched@0.9       sahi_uniform small -0.000667 -0.001412  0.000921  0.611
+router_matched@0.9 random_matched@0.9   all  0.006317  0.003486  0.008535  0.000
+router_matched@0.9 random_matched@0.9 small  0.006969  0.004250  0.010276  0.000
+router_matched@0.9     fusion_thr@0.9   all  0.000103 -0.001193  0.000710  0.583
+router_matched@0.9     fusion_thr@0.9 small  0.000735 -0.000199  0.001938  0.064
+router_matched@0.9  fusion_budget@0.5   all  0.011702  0.008129  0.015924  0.000
+router_matched@0.9  fusion_budget@0.5 small  0.010357  0.005155  0.015521  0.000
+router_matched@0.9  random_budget@0.5   all  0.025421  0.021327  0.028899  0.000
+router_matched@0.9  random_budget@0.5 small  0.024549  0.020731  0.029439  0.000
+  router_global@op       sahi_uniform   all  0.000774 -0.000944  0.002478  0.176
+  router_global@op       sahi_uniform small -0.000155 -0.001308  0.000955  0.543
+  router_global@op random_matched@0.9   all  0.008522  0.005743  0.011244  0.000
+  router_global@op random_matched@0.9 small  0.007481  0.004357  0.010303  0.000
+  router_global@op     fusion_thr@0.9   all  0.002308  0.000968  0.003971  0.000
+  router_global@op     fusion_thr@0.9 small  0.001247 -0.000117  0.002110  0.041
+  router_global@op  fusion_budget@0.5   all  0.013906  0.010742  0.018346  0.000
+  router_global@op  fusion_budget@0.5 small  0.010870  0.005275  0.015663  0.001
+  router_global@op  random_budget@0.5   all  0.027626  0.023967  0.031581  0.000
+  router_global@op  random_budget@0.5 small  0.025061  0.020695  0.029331  0.000
+ router_global@0.5       sahi_uniform   all  0.000167 -0.002612  0.003695  0.346
+ router_global@0.5       sahi_uniform small  0.004288  0.001931  0.007720  0.000
+ router_global@0.5 random_matched@0.9   all  0.007915  0.005029  0.011518  0.000
+ router_global@0.5 random_matched@0.9 small  0.011924  0.008194  0.015962  0.000
+ router_global@0.5     fusion_thr@0.9   all  0.001701 -0.000471  0.004935  0.055
+ router_global@0.5     fusion_thr@0.9 small  0.005690  0.003075  0.008292  0.000
+ router_global@0.5  fusion_budget@0.5   all  0.013299  0.009787  0.019017  0.000
+ router_global@0.5  fusion_budget@0.5 small  0.015313  0.009188  0.020728  0.000
+ router_global@0.5  random_budget@0.5   all  0.027019  0.023172  0.031280  0.000
+ router_global@0.5  random_budget@0.5 small  0.029504  0.024514  0.035459  0.000
+ fusion_budget@0.5       sahi_uniform   all -0.013132 -0.017190 -0.010055  1.000
+ fusion_budget@0.5       sahi_uniform small -0.011025 -0.015593 -0.005431  1.000
+ fusion_budget@0.5 random_matched@0.9   all -0.005384 -0.010604 -0.001442  0.993
+ fusion_budget@0.5 random_matched@0.9 small -0.003388 -0.008980  0.002748  0.852
+ fusion_budget@0.5     fusion_thr@0.9   all -0.011598 -0.015998 -0.008406  1.000
+ fusion_budget@0.5     fusion_thr@0.9 small -0.009623 -0.014623 -0.004397  0.999
+ fusion_budget@0.5  random_budget@0.5   all  0.013720  0.008539  0.017769  0.000
+ fusion_budget@0.5  random_budget@0.5 small  0.014191  0.008761  0.020847  0.000
+random_matched@0.9       sahi_uniform   all -0.007748 -0.010538 -0.004961  1.000
+random_matched@0.9       sahi_uniform small -0.007636 -0.010679 -0.004311  1.000
+random_matched@0.9     fusion_thr@0.9   all -0.006214 -0.008525 -0.003691  1.000
+random_matched@0.9     fusion_thr@0.9 small -0.006234 -0.009424 -0.003493  1.000
+random_matched@0.9  fusion_budget@0.5   all  0.005384  0.001442  0.010604  0.007
+random_matched@0.9  fusion_budget@0.5 small  0.003388 -0.002748  0.008980  0.148
+random_matched@0.9  random_budget@0.5   all  0.019104  0.015289  0.022566  0.000
+random_matched@0.9  random_budget@0.5 small  0.017580  0.013361  0.022725  0.000
+ random_budget@0.5       sahi_uniform   all -0.026852 -0.030467 -0.023275  1.000
+ random_budget@0.5       sahi_uniform small -0.025216 -0.029345 -0.021193  1.000
+ random_budget@0.5 random_matched@0.9   all -0.019104 -0.022566 -0.015289  1.000
+ random_budget@0.5 random_matched@0.9 small -0.017580 -0.022725 -0.013361  1.000
+ random_budget@0.5     fusion_thr@0.9   all -0.025318 -0.028829 -0.021623  1.000
+ random_budget@0.5     fusion_thr@0.9 small -0.023814 -0.028618 -0.019819  1.000
+ random_budget@0.5  fusion_budget@0.5   all -0.013720 -0.017769 -0.008539  1.000
+ random_budget@0.5  fusion_budget@0.5 small -0.014191 -0.020847 -0.008761  1.000
+写出 results\figures\fig13_ci_holdout.png

@@ -1,0 +1,17 @@
+﻿每类真值数： {'person': 13969, 'car': 16039, 'truck': 750, 'bus': 251}
+sahi_uniform               person   n_gt= 13969 AP=0.1895 AP50=0.4150 APs=0.1596
+sahi_uniform               car      n_gt= 16039 AP=0.3840 AP50=0.5728 APs=0.1971
+sahi_uniform               truck    n_gt=   750 AP=0.1096 AP50=0.1611 APs=0.0294
+sahi_uniform               bus      n_gt=   251 AP=0.2618 AP50=0.3692 APs=0.0815
+sahi_uniform               4类平均               AP50=0.3795（这些类别不再被合并成 vehicle）
+glance[det+edge]@0.9       person   n_gt= 13969 AP=0.1888 AP50=0.4103 APs=0.1583
+glance[det+edge]@0.9       car      n_gt= 16039 AP=0.3819 AP50=0.5724 APs=0.1962
+glance[det+edge]@0.9       truck    n_gt=   750 AP=0.1085 AP50=0.1583 APs=0.0264
+glance[det+edge]@0.9       bus      n_gt=   251 AP=0.2616 AP50=0.3688 APs=0.0850
+glance[det+edge]@0.9       4类平均               AP50=0.3774（这些类别不再被合并成 vehicle）
+random_matched@0.9#s0      person   n_gt= 13969 AP=0.1821 AP50=0.3998 APs=0.1523
+random_matched@0.9#s0      car      n_gt= 16039 AP=0.3730 AP50=0.5587 APs=0.1857
+random_matched@0.9#s0      truck    n_gt=   750 AP=0.1005 AP50=0.1498 APs=0.0253
+random_matched@0.9#s0      bus      n_gt=   251 AP=0.2489 AP50=0.3514 APs=0.0792
+random_matched@0.9#s0      4类平均               AP50=0.3649（这些类别不再被合并成 vehicle）
+wrote C:\Users\31392\Desktop\数学建模\results\per_class.csv

@@ -461,7 +461,7 @@ if __name__ == "__main__":
     ap.add_argument("cmd", choices=["cache", "sim", "e2e", "buckets"])
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--weights", default="yolo11s.pt")
-    ap.add_argument("--device", default="cuda:0")
+    ap.add_argument("--device", default="auto", help="auto = 有 CUDA 用 cuda:0，否则 cpu")
     ap.add_argument("--op", type=float, default=0.9, help="Glance-SAHI 的工作点阈值")
     ap.add_argument("--img-weight", type=float, default=0.3)
     ap.add_argument("--check-all", action="store_true")
