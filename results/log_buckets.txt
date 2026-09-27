@@ -1,0 +1,21 @@
+﻿sahi_uniform                 [0,20)     imgs=  78 slices=100.0% AP=0.4082 AP50=0.6644 APs=0.2281 cov_small=1.000
+sahi_uniform                 [20,50)    imgs= 182 slices=100.0% AP=0.3181 AP50=0.5366 APs=0.2131 cov_small=1.000
+sahi_uniform                 [50,100)   imgs= 235 slices=100.0% AP=0.2888 AP50=0.4989 APs=0.1864 cov_small=1.000
+sahi_uniform                 [100,inf)  imgs=  53 slices=100.0% AP=0.2397 AP50=0.4264 APs=0.1518 cov_small=1.000
+glance[det+edge]@0.9         [0,20)     imgs=  78 slices= 52.8% AP=0.3951 AP50=0.6463 APs=0.1750 cov_small=0.730
+glance[det+edge]@0.9         [20,50)    imgs= 182 slices= 79.8% AP=0.3153 AP50=0.5337 APs=0.2124 cov_small=0.958
+glance[det+edge]@0.9         [50,100)   imgs= 235 slices= 84.4% AP=0.2878 AP50=0.4982 APs=0.1861 cov_small=0.949
+glance[det+edge]@0.9         [100,inf)  imgs=  53 slices= 90.7% AP=0.2391 AP50=0.4265 APs=0.1521 cov_small=0.988
+random_matched@0.9#s0        [0,20)     imgs=  78 slices= 52.8% AP=0.3870 AP50=0.6346 APs=0.1676 cov_small=0.685
+random_matched@0.9#s0        [20,50)    imgs= 182 slices= 79.8% AP=0.3016 AP50=0.5141 APs=0.1964 cov_small=0.877
+random_matched@0.9#s0        [50,100)   imgs= 235 slices= 84.4% AP=0.2796 AP50=0.4843 APs=0.1775 cov_small=0.897
+random_matched@0.9#s0        [100,inf)  imgs=  53 slices= 90.7% AP=0.2366 AP50=0.4203 APs=0.1500 cov_small=0.972
+random_matched@0.9#s1        [0,20)     imgs=  78 slices= 52.8% AP=0.3792 AP50=0.6319 APs=0.1533 cov_small=0.616
+random_matched@0.9#s1        [20,50)    imgs= 182 slices= 79.8% AP=0.3019 AP50=0.5149 APs=0.1961 cov_small=0.871
+random_matched@0.9#s1        [50,100)   imgs= 235 slices= 84.4% AP=0.2810 AP50=0.4873 APs=0.1792 cov_small=0.900
+random_matched@0.9#s1        [100,inf)  imgs=  53 slices= 90.7% AP=0.2364 AP50=0.4207 APs=0.1484 cov_small=0.958
+random_matched@0.9#s2        [0,20)     imgs=  78 slices= 52.8% AP=0.3814 AP50=0.6354 APs=0.1690 cov_small=0.699
+random_matched@0.9#s2        [20,50)    imgs= 182 slices= 79.8% AP=0.3014 AP50=0.5115 APs=0.1925 cov_small=0.863
+random_matched@0.9#s2        [50,100)   imgs= 235 slices= 84.4% AP=0.2814 AP50=0.4848 APs=0.1782 cov_small=0.906
+random_matched@0.9#s2        [100,inf)  imgs=  53 slices= 90.7% AP=0.2367 AP50=0.4226 APs=0.1503 cov_small=0.981
+wrote C:\Users\31392\Desktop\数学建模\results\buckets.csv

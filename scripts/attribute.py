@@ -28,6 +28,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from glance_sahi.config import GlanceConfig  # noqa: E402
+from glance_sahi.router import gt_targets  # noqa: E402,F401  （同口径，active_eval 经 AT.gt_targets 复用）
 from glance_sahi.selector import select_slices  # noqa: E402
 
 import run_eval as R  # noqa: E402
@@ -37,19 +38,6 @@ for _s in (sys.stdout, sys.stderr):
         _s.reconfigure(encoding="utf-8")
     except Exception:
         pass
-
-
-def gt_targets(gt: dict) -> dict:
-    """每个非 crowd 目标的 (cx, cy, 匹配半径, 评测类别, 是否小目标)。"""
-    out: dict[int, list] = {}
-    for a in gt["annotations"]:
-        if a["iscrowd"]:
-            continue
-        x, y, w, h = a["bbox"]
-        out.setdefault(a["image_id"], []).append(
-            (x + w / 2.0, y + h / 2.0, max(0.5 * float(np.hypot(w, h)), 6.0),
-             int(a["category_id"]), bool(a["area"] < 32 * 32)))
-    return out
 
 
 def det_arrays(dets: np.ndarray):

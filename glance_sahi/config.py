@@ -11,6 +11,10 @@ class GlanceConfig:
     postprocess_type: str = "NMS"
     postprocess_match_metric: str = "IOU"
     postprocess_match_threshold: float = 0.5
+    # 切片推理的批大小：1 = 逐片（默认，与官方 get_sliced_prediction 默认行为逐位一致）；
+    # >1 走 YOLO 原生批推理，GPU 上更快（RTX 3050 实测 8 片 1.3×），但批内卷积的浮点误差会让
+    # 阈值边缘的框偶有出入（实测 194 框差 1 个），所以不再逐位一致。SAHI 基线用同一个值。
+    batch_size: int = 1
 
     # --- 置信度 ---
     output_conf: float = 0.05   # 最终输出的检测阈值（SAHI 基线相同）
@@ -35,3 +39,13 @@ class GlanceConfig:
     budget: float = 0.5         # mode="budget" 时保留分数最高的比例
     tau: float = 1.0            # mode="evidence"：片内证据量（弱检测置信度之和）≥ τ 才细看，绝对值可跨图标定
     min_slices: int = 0         # 保底切片数：不足时按分数补齐（0=关闭；evidence 模式自动至少 1）
+    # 覆盖感知去冗余（REPORT 3.19）：选中片里"独占面积" < 该比例的低分片直接跳过（网格边缘贴边片与邻片几乎重叠）。
+    # 0 = 关闭（默认，保持既有结果）；VisDrone 上 0.1 在 θ=0.9 之上再省 32% 切片、AP −0.22（同数随机删 −1.19）
+    prune_min_new: float = 0.0
+
+    # --- 打分器（路由器）---
+    #   "fusion"  手工稀疏门：S = 1 − (1 − S_det)(1 − λ·S_img)（默认，零训练）
+    #   "learned" 可学习稀疏路由器 g_φ(x_k)：小 MLP，吃同样的扫视证据（REPORT 3.15，scripts/train_router.py）
+    scorer: str = "fusion"
+    router_path: str = "results/router.json"
+    router_threshold: float | None = None   # learned + threshold 模式的门限；None = 用 router.json 里的默认工作点

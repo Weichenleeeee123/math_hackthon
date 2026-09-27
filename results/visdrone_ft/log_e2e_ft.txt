@@ -1,0 +1,4 @@
+full_image           AP=0.3770 AP50=0.6521 APs=0.2558 25.4ms/img slices=0.00
+sahi_uniform         AP=0.4708 AP50=0.7869 APs=0.3932 170.9ms/img slices=7.80
+glance_sahi          AP=0.4709 AP50=0.7874 APs=0.3931 167.9ms/img slices=7.06
+glance_all_slices    AP=0.4708 AP50=0.7869 APs=0.3932 171.1ms/img slices=7.80

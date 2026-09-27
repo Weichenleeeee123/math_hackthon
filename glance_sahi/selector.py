@@ -37,6 +37,32 @@ def select_slices(scores: np.ndarray, mode: str, threshold: float, budget: float
     return np.array(sorted(keep), dtype=int)
 
 
+def prune_redundant(slices, sel, scores, min_new: float = 0.1, cell: int = 8) -> np.ndarray:
+    """覆盖感知去冗余（REPORT 3.19）：SAHI 网格在右/下边缘会把最后一片贴边放，与前一片几乎重叠
+    （如 VisDrone 1360 宽：x 起点 820 与 848），两片都跑纯属浪费。
+
+    按分数从低到高逐片检查：若它在当前保留集里"只有自己覆盖"的面积占比 < min_new，就删掉。
+    贪心保证每删一片，保留集的覆盖并集最多少 min_new·片面积，且高分片优先保留。
+    面积在 cell×cell 像素的栅格上计数（O(片数·片面积/cell²)，1080p 约 0.1 ms）。
+    min_new ≤ 0 时原样返回（默认关闭）。
+    """
+    sel = np.asarray(sel, dtype=int)
+    if min_new <= 0 or len(sel) < 2:
+        return np.sort(sel)
+    s = np.asarray(slices, dtype=int)[sel] // cell
+    cnt = np.zeros((int(s[:, 3].max()), int(s[:, 2].max())), np.int32)
+    for x1, y1, x2, y2 in s:
+        cnt[y1:y2, x1:x2] += 1
+    keep = np.ones(len(sel), bool)
+    sc = np.asarray(scores)[sel]
+    for j in sorted(range(len(sel)), key=lambda j: (sc[j], -sel[j])):
+        x1, y1, x2, y2 = s[j]
+        if (cnt[y1:y2, x1:x2] == 1).mean() < min_new:
+            cnt[y1:y2, x1:x2] -= 1
+            keep[j] = False
+    return np.sort(sel[keep])
+
+
 def random_slices(n: int, k: int, rng: np.random.Generator) -> np.ndarray:
     """对照组：从同一网格里随机选 k 片。"""
     return np.sort(rng.choice(n, size=min(k, n), replace=False)) if k > 0 else np.zeros(0, dtype=int)

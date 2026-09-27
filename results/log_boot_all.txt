@@ -1,0 +1,41 @@
+﻿scope=all：548 图，B=1000
+  full_image                 AP=0.2003 APs=0.0930 slices=0.0% (17.6s)
+  sahi_uniform               AP=0.2840 APs=0.1788 slices=100.0% (21.6s)
+  fusion_thr@0.9             AP=0.2827 APs=0.1775 slices=79.0% (20.7s)
+  oracle_gt_small            AP=0.2854 APs=0.1815 slices=76.2% (22.2s)
+  random_matched@0.9#s0      AP=0.2751 APs=0.1697 slices=79.0% (20.9s)
+  random_matched@0.9#s1      AP=0.2760 APs=0.1698 slices=79.0% (20.7s)
+  random_matched@0.9#s2      AP=0.2762 APs=0.1692 slices=79.0% (20.9s)
+bootstrap 1000 次用时 217.8s
+            method area       AP       lo       hi       se  slice_frac
+        full_image  all 0.200257 0.191259 0.210286 0.004955    0.000000
+      sahi_uniform  all 0.283956 0.273773 0.295778 0.005462    1.000000
+    fusion_thr@0.9  all 0.282715 0.272332 0.294386 0.005492    0.789942
+   oracle_gt_small  all 0.285435 0.275384 0.297180 0.005490    0.762105
+random_matched@0.9  all 0.275768 0.264986 0.286667 0.005471    0.789942
+            method                 vs  area     delta        lo        hi  p_le0
+        full_image       sahi_uniform   all -0.083699 -0.088514 -0.079439  1.000
+        full_image       sahi_uniform small -0.085777 -0.091511 -0.080844  1.000
+        full_image random_matched@0.9   all -0.075511 -0.079661 -0.070931  1.000
+        full_image random_matched@0.9 small -0.076531 -0.082337 -0.072372  1.000
+        full_image     fusion_thr@0.9   all -0.082458 -0.087123 -0.077994  1.000
+        full_image     fusion_thr@0.9 small -0.084453 -0.090408 -0.079747  1.000
+      sahi_uniform random_matched@0.9   all  0.008188  0.006996  0.010695  0.000
+      sahi_uniform random_matched@0.9 small  0.009246  0.007005  0.011471  0.000
+      sahi_uniform     fusion_thr@0.9   all  0.001241  0.000546  0.002545  0.001
+      sahi_uniform     fusion_thr@0.9 small  0.001325  0.000278  0.002087  0.003
+    fusion_thr@0.9       sahi_uniform   all -0.001241 -0.002545 -0.000546  0.999
+    fusion_thr@0.9       sahi_uniform small -0.001325 -0.002087 -0.000278  0.997
+    fusion_thr@0.9 random_matched@0.9   all  0.006947  0.005697  0.009028  0.000
+    fusion_thr@0.9 random_matched@0.9 small  0.007921  0.005956  0.010107  0.000
+   oracle_gt_small       sahi_uniform   all  0.001479  0.000226  0.003122  0.009
+   oracle_gt_small       sahi_uniform small  0.002709  0.001972  0.003411  0.000
+   oracle_gt_small random_matched@0.9   all  0.009667  0.008249  0.012777  0.000
+   oracle_gt_small random_matched@0.9 small  0.011955  0.009467  0.014167  0.000
+   oracle_gt_small     fusion_thr@0.9   all  0.002720  0.001669  0.004763  0.000
+   oracle_gt_small     fusion_thr@0.9 small  0.004033  0.002693  0.004967  0.000
+random_matched@0.9       sahi_uniform   all -0.008188 -0.010695 -0.006996  1.000
+random_matched@0.9       sahi_uniform small -0.009246 -0.011471 -0.007005  1.000
+random_matched@0.9     fusion_thr@0.9   all -0.006947 -0.009028 -0.005697  1.000
+random_matched@0.9     fusion_thr@0.9 small -0.007921 -0.010107 -0.005956  1.000
+写出 C:\Users\31392\Desktop\数学建模\results\figures\fig13_ci_all.png

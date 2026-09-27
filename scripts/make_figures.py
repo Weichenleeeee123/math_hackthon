@@ -76,6 +76,7 @@ def fig_ablation(df):
     variants = [("det+edge", "检测先验 + 边缘显著性（默认）", "o"), ("det", "仅检测先验", "s"),
                 ("uncertain+edge", "检测先验（4p(1−p) 加权）+ 边缘", "^"),
                 ("max+edge", "检测先验（v0：置信度取最大）+ 边缘", "v"),
+                ("heatmap+edge", "高斯热图先验 + 边缘", "D"),
                 ("edge", "仅边缘显著性", "o"), ("spectral", "仅谱残差显著性", "o"),
                 ("det+spectral", "检测先验 + 谱残差", "^")]
     variants = [v for v in variants if f"glance_{v[0]}" in set(df.family)]
@@ -110,7 +111,9 @@ def fig_det_variants(df):
     """只画“检测先验权重取法”的消融：noisy-OR vs 4p(1−p) vs 取最大（v0）。"""
     fams = [("det", "noisy-OR：1 − Π(1 − c_j)（本文）", "o"),
             ("uncertain", "不确定度加权：4p(1−p)（消融）", "^"),
-            ("max", "取最大置信度（v0，消融对照）", "v")]
+            ("max", "取最大置信度（v0，消融对照）", "v"),
+            ("heatmap", "高斯热图先验（消融）", "D"),
+            ("evidence", "证据质量阈值 Σc ≥ τ（τ 扫描）", "P")]
     fams = [f for f in fams if f"glance_{f[0]}" in set(df.family)]
     if not fams:
         return
@@ -194,6 +197,11 @@ if __name__ == "__main__":
         DS_NAME = {"dota": "DOTA-v1.0 val"}.get(sys.argv[2], sys.argv[2])
     FIG.mkdir(parents=True, exist_ok=True)
     df = pd.read_csv(RES / "sweep.csv")
+    abl = RES / "sweep_abl.csv"  # run_eval.py sim 的打分函数消融（单独文件，不改动 sweep.csv 旧行）
+    if abl.exists():
+        a = pd.read_csv(abl)
+        a = a[~a.family.isin(set(df.family))]
+        df = pd.concat([df, a], ignore_index=True)
     fig_pareto(df, "slices_per_img", "每张图的切片推理次数", "fig1_pareto_slices.png", op)
     fig_pareto(df, "ms_per_img", "每张图耗时（ms，RTX 3050 Laptop）", "fig2_pareto_time.png", op)
     fig_ablation(df)

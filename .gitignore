@@ -25,6 +25,10 @@ Thumbs.db
 Desktop.ini
 ~$*
 
+# ---- 临时输出（脚本重定向的 stdout/stderr、Demo 运行日志） ----
+_*.txt
+results/*.log
+
 # ---- 强基线逐图结果（strong_baselines.py run 生成，可重跑） ----
 results/strong*.pkl
 results/*/strong*.pkl

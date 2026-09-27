@@ -17,8 +17,9 @@ from sahi.prediction import PredictionResult
 from sahi.slicing import get_slice_bboxes
 
 from .config import GlanceConfig
+from .router import feature_cfg, load_router, slice_features
 from .saliency import detection_prior, evidence_mass, fuse, heatmap_prior, image_prior_map, region_prior
-from .selector import random_slices, select_slices
+from .selector import prune_redundant, random_slices, select_slices
 
 
 @dataclass
@@ -41,23 +42,74 @@ class GlanceStats:
         return self.t_glance + self.t_saliency + self.t_slices + self.t_post
 
 
-def make_postprocess(cfg: GlanceConfig):
-    return POSTPROCESS_NAME_TO_CLASS[cfg.postprocess_type](
+def preds_to_np(preds) -> np.ndarray:
+    """ObjectPrediction 列表 → (N, 6) [x1, y1, x2, y2, score, category_id]。"""
+    return np.array([p.bbox.to_xyxy() + [p.score.value, p.category.id] for p in preds],
+                    dtype=np.float32).reshape(-1, 6)
+
+
+def make_postprocess(cfg: GlanceConfig, model=None):
+    # 与 get_sliced_prediction 相同：OBB 检测器只支持 NMS，不管配置写的是什么
+    ptype = "NMS" if getattr(model, "is_obb", False) else cfg.postprocess_type
+    return POSTPROCESS_NAME_TO_CLASS[ptype](
         match_threshold=cfg.postprocess_match_threshold,
         match_metric=cfg.postprocess_match_metric,
         class_agnostic=False,
     )
 
 
-def _predict_slices(image, model, slices, idx, exclude_ids):
+def _predict_slices(image, model, slices, idx, exclude_ids, batch_size: int = 1):
     preds = []
     h, w = image.shape[:2]
-    for k in idx:
-        x1, y1, x2, y2 = slices[k]
-        res = get_prediction(image[y1:y2, x1:x2], model, shift_amount=[x1, y1], full_shape=[h, w],
-                             exclude_classes_by_id=exclude_ids)
-        preds.extend(p.get_shifted_object_prediction() for p in res.object_prediction_list)
+    if batch_size <= 1:
+        for k in idx:
+            x1, y1, x2, y2 = slices[k]
+            res = get_prediction(image[y1:y2, x1:x2], model, shift_amount=[x1, y1], full_shape=[h, w],
+                                 exclude_classes_by_id=exclude_ids)
+            preds.extend(p.get_shifted_object_prediction() for p in res.object_prediction_list)
+        return preds
+    # 批推理：与 get_sliced_prediction(batch_size=B) 的循环体相同，全选时两边的批划分也相同
+    idx = list(idx)
+    for b in range(0, len(idx), batch_size):
+        boxes = [slices[k] for k in idx[b:b + batch_size]]
+        model.perform_batch_inference([np.ascontiguousarray(image[y1:y2, x1:x2]) for x1, y1, x2, y2 in boxes])
+        model.convert_original_predictions(shift_amount=[[x1, y1] for x1, y1, _, _ in boxes],
+                                           full_shape=[[h, w]] * len(boxes))
+        for image_preds in model.object_prediction_list_per_image:
+            preds.extend(p.get_shifted_object_prediction()
+                         for p in filter_predictions(image_preds, None, exclude_ids) if p)
     return preds
+
+
+def score_slices(image: np.ndarray, glance_np: np.ndarray, slices: list, cfg: GlanceConfig):
+    """每个切片的路由分数。返回 (scores, evidence, heat)。
+
+    scorer="fusion"：手工稀疏门（与原实现逐位一致）；
+    scorer="learned"：可学习路由器 g_φ(x_k)，特征与离线训练同一路径（router.slice_features）。
+    """
+    h, w = image.shape[:2]
+    boxes, confs = glance_np[:, :4], glance_np[:, 4]
+    evidence = evidence_mass(boxes, confs, slices)
+    heat = None
+    if cfg.scorer == "learned":
+        router = load_router(cfg.router_path)
+        # 特征里的 fused/检测先验/边缘先验依赖 λ、margin、σ、缩略图尺寸：必须用训练时的值（存在 router.json 里）
+        rcfg = feature_cfg(cfg, router.meta)
+        sal, scale = image_prior_map(image, "edge", rcfg.img_map_size)
+        prior_edge = region_prior(sal, scale, slices)
+        X = slice_features(glance_np, (h, w), slices, prior_edge, rcfg)
+        return router.predict_proba(X), evidence, heat
+    if cfg.scorer != "fusion":
+        raise ValueError(cfg.scorer)
+    if cfg.det_prior == "heatmap":
+        s_det, heat, _ = heatmap_prior(boxes, confs, (h, w), slices, cfg.img_map_size, cfg.heat_sigma)
+    else:
+        s_det = detection_prior(boxes, confs, slices, cfg.det_margin, cfg.det_prior)
+    s_img = None
+    if cfg.img_prior != "none" and cfg.img_weight > 0:
+        sal, scale = image_prior_map(image, cfg.img_prior, cfg.img_map_size)
+        s_img = region_prior(sal, scale, slices)
+    return fuse(s_det, s_img, cfg.img_weight), evidence, heat
 
 
 def glance_sliced_prediction(
@@ -77,6 +129,22 @@ def glance_sliced_prediction(
     st = GlanceStats()
     slices = get_slice_bboxes(h, w, cfg.slice_size, cfg.slice_size, False, cfg.overlap_ratio, cfg.overlap_ratio)
     st.slices, st.n_slices_total = slices, len(slices)
+    if cfg.scorer == "learned" and cfg.mode not in ("threshold", "budget"):
+        raise ValueError(f"scorer='learned' 只支持 mode='threshold' | 'budget'，收到 {cfg.mode!r}")
+
+    if len(slices) == 1:
+        # 图不大于一个切片：唯一的切片就是整图，扫视与细看是同一次推理。
+        # 与 get_sliced_prediction 相同（num_slices == 1 时不做 standard pred），只跑这一片
+        t0 = time.perf_counter()
+        preds = _predict_slices(image, model, slices, [0], exclude_classes_by_id)
+        st.t_slices = time.perf_counter() - t0
+        st.slice_scores, st.selected, st.n_slices_run = np.ones(1, np.float32), np.zeros(1, int), 1
+        t0 = time.perf_counter()
+        if len(preds) > 1:
+            preds = make_postprocess(cfg, model)(preds)
+        st.t_post = time.perf_counter() - t0
+        return PredictionResult(image=image, object_prediction_list=preds,
+                                durations_in_seconds={"prediction": st.t_slices, "postprocess": st.t_post}), st
 
     # 1) 扫视：整图缩小推理一次，低阈值
     t0 = time.perf_counter()
@@ -84,27 +152,23 @@ def glance_sliced_prediction(
                             confidence_threshold=cfg.glance_conf).object_prediction_list
     st.t_glance = time.perf_counter() - t0
 
-    # 2) 打分 + 选片
+    # 2) 打分 + 选片（路由）
     t0 = time.perf_counter()
     if force_select is not None:
         sel = np.asarray(force_select, dtype=int)
         scores = np.ones(len(slices), dtype=np.float32)
     else:
-        boxes = np.array([p.bbox.to_xyxy() for p in glance], dtype=np.float32).reshape(-1, 4)
-        confs = np.array([p.score.value for p in glance], dtype=np.float32)
-        if cfg.det_prior == "heatmap":
-            s_det, st.heat, _ = heatmap_prior(boxes, confs, (h, w), slices, cfg.img_map_size, cfg.heat_sigma)
+        glance_np = preds_to_np(glance)
+        st.glance_boxes = glance_np[:, :5]  # 扫视阶段的弱检测 (x1, y1, x2, y2, conf)，可视化用
+        scores, st.evidence, st.heat = score_slices(image, glance_np, slices, cfg)
+        if cfg.scorer == "learned":
+            thr = cfg.router_threshold if cfg.router_threshold is not None \
+                else load_router(cfg.router_path).default_threshold
+            sel = select_slices(scores, cfg.mode, thr, cfg.budget, min_slices=cfg.min_slices)
         else:
-            s_det = detection_prior(boxes, confs, slices, cfg.det_margin, cfg.det_prior)
-        s_img = None
-        if cfg.img_prior != "none" and cfg.img_weight > 0:
-            sal, scale = image_prior_map(image, cfg.img_prior, cfg.img_map_size)
-            s_img = region_prior(sal, scale, slices)
-        scores = fuse(s_det, s_img, cfg.img_weight)
-        st.evidence = evidence_mass(boxes, confs, slices)
-        st.glance_boxes = np.hstack([boxes, confs[:, None]])
-        sel = select_slices(scores, cfg.mode, cfg.threshold, cfg.budget,
-                            st.evidence, cfg.tau, cfg.min_slices)
+            sel = select_slices(scores, cfg.mode, cfg.threshold, cfg.budget,
+                                st.evidence, cfg.tau, cfg.min_slices)
+        sel = prune_redundant(slices, sel, scores, cfg.prune_min_new)
         if random_k_rng is not None:
             sel = random_slices(len(slices), len(sel), random_k_rng)
     st.slice_scores, st.selected, st.n_slices_run = scores, sel, len(sel)
@@ -112,14 +176,14 @@ def glance_sliced_prediction(
 
     # 3) 只对选中切片推理（输出阈值与 SAHI 相同）
     t0 = time.perf_counter()
-    preds = _predict_slices(image, model, slices, sel, exclude_classes_by_id)
+    preds = _predict_slices(image, model, slices, sel, exclude_classes_by_id, cfg.batch_size)
     st.t_slices = time.perf_counter() - t0
 
     # 4) 合并：扫视结果中 ≥ 输出阈值的部分，就是 SAHI 的 standard prediction
     t0 = time.perf_counter()
     preds.extend(p for p in glance if p.score.value >= cfg.output_conf)
     if len(preds) > 1:
-        preds = make_postprocess(cfg)(preds)
+        preds = make_postprocess(cfg, model)(preds)
     st.t_post = time.perf_counter() - t0
 
     return PredictionResult(image=image, object_prediction_list=preds,
@@ -142,6 +206,7 @@ def sahi_uniform_prediction(image, model, cfg: GlanceConfig, exclude_classes_by_
         postprocess_match_threshold=cfg.postprocess_match_threshold,
         force_postprocess_type=True,
         exclude_classes_by_id=exclude_classes_by_id,
+        batch_size=max(int(cfg.batch_size), 1),
         verbose=0,
     )
     dt = time.perf_counter() - t0

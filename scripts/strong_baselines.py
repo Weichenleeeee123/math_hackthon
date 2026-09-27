@@ -123,10 +123,12 @@ def cmd_run(args):
     from glance_sahi.detector import build_model
 
     names = method_names(args)
-    cfg = GlanceConfig(slice_size=args.slice_size, img_prior="edge", img_weight=args.img_weight)
+    cfg = GlanceConfig(slice_size=args.slice_size, img_prior="edge", img_weight=args.img_weight,
+                       batch_size=args.batch_size)
     coco = json.loads(R.GT.read_text())
     images = coco["images"][: args.limit] if args.limit else coco["images"]
-    model = build_model(args.weights, conf=cfg.output_conf, device=args.device, image_size=args.imgsz)
+    model = build_model(args.weights, conf=cfg.output_conf, device=args.device, image_size=args.imgsz,
+                        half=args.half)
     import torch
 
     if torch.cuda.is_available():
@@ -281,6 +283,8 @@ if __name__ == "__main__":
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--tag", default="")
     ap.add_argument("--gpu-mem-frac", type=float, default=0.85, help="显存上限比例；超过记为 OOM（放不下）")
+    ap.add_argument("--half", action="store_true", help="FP16 推理（REPORT 3.18）")
+    ap.add_argument("--batch-size", type=int, default=1, help="SAHI 与 Glance 的切片批大小；1 = 逐片")
     a = ap.parse_args()
     R.set_dataset(a.dataset)
     {"run": cmd_run, "eval": cmd_eval}[a.cmd](a)

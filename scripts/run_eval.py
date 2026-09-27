@@ -53,9 +53,7 @@ set_dataset("visdrone")
 from glance_sahi.imageio import imread_rgb as load_rgb  # noqa: E402  （Windows 中文路径安全：fromfile + imdecode）
 
 
-def preds_to_np(preds):
-    return np.array([p.bbox.to_xyxy() + [p.score.value, p.category.id] for p in preds],
-                    dtype=np.float32).reshape(-1, 6)
+from glance_sahi.predict import preds_to_np  # noqa: E402,F401  （strong_baselines / illegal_parking 经 R.preds_to_np 复用）
 
 
 def warmup(model, images, n=3, slice_size=512):
@@ -79,7 +77,8 @@ def cmd_cache(args):
     cfg = GlanceConfig(slice_size=args.slice_size)
     coco = json.loads(GT.read_text())
     images = coco["images"][: args.limit] if args.limit else coco["images"]
-    model = build_model(args.weights, conf=cfg.output_conf, device=args.device, image_size=args.imgsz)
+    model = build_model(args.weights, conf=cfg.output_conf, device=args.device, image_size=args.imgsz,
+                        half=args.half)
     warmup(model, images, slice_size=cfg.slice_size)
 
     cache = {"weights": args.weights, "imgsz": args.imgsz, "cfg": cfg.__dict__, "images": []}
@@ -217,7 +216,7 @@ def prior_kinds(prior: str):
     """把 "det" / "edge" / "det+edge" 这类写法的先验名解析成 (det_kind, img_kind)。
 
     兼容新增变体："uncertain+edge" → ("uncertain", "edge")、"heatmap" → ("heatmap", None)。
-    供 coverage.py / lambda_check.py / edge_vs_random.py / visualize.py / pick_cases.py 复用。
+    供 coverage.py / lambda_check.py / edge_vs_random.py / visualize.py / apparent_size.py 复用。
     """
     head, _, tail = prior.partition("+")
     det_kind = head if head in ("noisyor", "uncertain", "max", "heatmap", "det") else None
@@ -361,7 +360,8 @@ def cmd_e2e(args):
     from glance_sahi.predict import full_image_prediction, glance_sliced_prediction, sahi_uniform_prediction
 
     EXCLUDE_COCO_IDS = EXCLUDE
-    cfg = GlanceConfig(threshold=args.op, img_prior="edge", img_weight=args.img_weight, slice_size=args.slice_size)
+    cfg = GlanceConfig(threshold=args.op, img_prior="edge", img_weight=args.img_weight, slice_size=args.slice_size,
+                       batch_size=args.batch_size)
     gt_path = GT
     coco = json.loads(gt_path.read_text())
     images = coco["images"][: args.limit] if args.limit else coco["images"]
@@ -465,7 +465,7 @@ if __name__ == "__main__":
     ap.add_argument("cmd", choices=["cache", "sim", "e2e", "buckets"])
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--weights", default="yolo11s.pt")
-    ap.add_argument("--device", default="cuda:0")
+    ap.add_argument("--device", default="auto", help="auto = 有 CUDA 用 cuda:0，否则 cpu")
     ap.add_argument("--op", type=float, default=0.9, help="Glance-SAHI 的工作点阈值")
     ap.add_argument("--img-weight", type=float, default=0.3)
     ap.add_argument("--check-all", action="store_true")
@@ -475,7 +475,10 @@ if __name__ == "__main__":
     ap.add_argument("--dataset", default="visdrone", choices=list(datasets.DATASETS))
     ap.add_argument("--slice-size", type=int, default=512, help="cache/e2e 的切片边长（SAHI 基线与 Glance 共用）")
     ap.add_argument("--imgsz", type=int, default=640, help="检测器输入尺寸（OBB 检测器用 1024）")
+    ap.add_argument("--batch-size", type=int, default=1,
+                    help="e2e 的切片批大小（SAHI 基线与 Glance 共用）；1 = 逐片，与既有结果逐位一致")
     ap.add_argument("--res-tag", default="", help="结果目录后缀：results/<dataset><res-tag>/，不覆盖原结果")
+    ap.add_argument("--half", action="store_true", help="e2e 用 FP16 推理（与既有 FP32 结果不再逐位一致）")
     a = ap.parse_args()
     set_dataset(a.dataset, a.res_tag)
     {"cache": cmd_cache, "sim": cmd_sim, "e2e": cmd_e2e, "buckets": cmd_buckets}[a.cmd](a)
