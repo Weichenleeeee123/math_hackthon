@@ -66,9 +66,10 @@ SAHI 对整张图均匀切片、每片都跑一次检测器；Glance-SAHI 先把
 
 `gain_by_size.py` 从另一端交叉验证（`results/dota15/gain_by_size_theta0.9.csv`，"找到"= 同类检测框与真值 IoU ≥ 0.5）：SAHI 相对整图推理多找回 **6781 个**目标，θ=0.9 的 Glance 保住其中 **85.7%**（θ=0.5 放宽到 93.1%）。保住率的最低点落在最难一档（8–16 px 92.6% → 4–8 px 83.2% → <4 px 64.9%），与上面覆盖率的排序一致。值得注意的是**增益的分布**：占全部增益 41.2% 的 8–16 px 那一档，恰好也是保住率最高的一档——SAHI 最有用处的目标，Glance 基本都留住了。
 
-交互 Demo（Gradio），同一张图并排跑 SAHI / 手工门 / 可学习路由，显示真实切片数、耗时与提速（不是模拟）：
-- `app.py`：默认加载最新微调模型 `weights/yolo11s-visdrone-ft.pt` + `results/visdrone_ft/router_ft.json`，默认站在路由 top-50% 预算这个卖点上；`--weights yolo11s.pt` 切回 COCO 零训练模型，`--dataset dota` 切到 DOTA 的路由器与示例图。
-- `demo_sahi_vs_glance.py`：现场宣讲版，SAHI 全切 / Glance-SAHI / 扫视打分三联画 + 检测器预设（COCO / 微调 / OBB）。
+交互 Demo（Gradio），显示真实切片数、耗时与提速（不是模拟）：
+- `app.py`：现场宣讲版，SAHI 全切 / Glance-SAHI / 扫视打分三联画 + 检测器预设（COCO / 微调 / OBB）。
+- `app_router.py`：同一张图并排跑 SAHI / 手工门 / 可学习路由；默认加载最新微调模型 `weights/yolo11s-visdrone-ft.pt` + `results/visdrone_ft/router_ft.json`，默认站在路由 top-50% 预算这个卖点上；`--weights yolo11s.pt` 切回 COCO 零训练模型，`--dataset dota` 切到 DOTA 的路由器与示例图。
+- `demo_sahi_vs_glance.py`：`app.py` 的副本（与 `app.py` 内容相同），保留旧入口名。
 
 ## 仓库里有什么 / 需要自己准备什么
 
@@ -139,8 +140,9 @@ scripts/
   coverage.py         与检测器无关的“目标覆盖率 vs 切片比例” + fig5
   lambda_check.py     图像先验权重 λ 的敏感性
   edge_vs_random.py   DOTA 上“仅边缘先验” vs 同数量随机选片
-app.py                交互 Demo（Gradio）：SAHI / 手工门 / 可学习路由并排对比（默认接最新微调模型）
-demo_sahi_vs_glance.py 现场宣讲版 Demo（Gradio）：三联画 + 检测器预设，来自 PR #5
+app.py                现场宣讲版 Demo（Gradio）：三联画 + 检测器预设，来自 PR #5
+app_router.py         交互 Demo（Gradio）：SAHI / 手工门 / 可学习路由并排对比（默认接最新微调模型）
+demo_sahi_vs_glance.py app.py 的副本（旧入口名）
 tests/                单元测试 64 项（不需要 GPU / 数据集）：test_core.py 28 项（网格与 SAHI 一致、noisy-OR 累积弱证据、热图、
                       打分变体、τ/θ/E 选片、规则层、类别映射、分箱标定 PAVA/ECE、主动选片）；test_router.py 17 项（特征与
                       离线一致、在线打分用训练时的 λ/margin/σ、增量标签、路由选片）；test_predict.py 9 项（假检测器驱动整条
@@ -198,10 +200,10 @@ $py = ".\.venv\Scripts\python.exe"
 & $py scripts/precision_ablation.py                  # FP16+批 vs FP32 逐片，配对 bootstrap
 & $py scripts/res_route.py --dataset visdrone_ft --tag _fp16b16   # 分辨率路由（离线，读上面的逐图结果）
 & $py scripts/prune_eval.py                          # 覆盖感知去冗余 + 随机删片对照（VisDrone / 微调 / DOTA，离线约 15 分钟）
-& $py app.py                                         # 交互 Demo（默认最新微调模型 + router_ft），浏览器打开 http://127.0.0.1:7860
-& $py app.py --weights yolo11s.pt                    # 切回 COCO 零训练模型
-& $py app.py --dataset dota                          # DOTA 版 Demo
-& $py demo_sahi_vs_glance.py                         # 现场宣讲版（三联画 + 检测器预设），默认 7860；加 --port 7861 与 app.py 同时开
+& $py app.py                                         # 现场宣讲版（三联画 + 检测器预设），浏览器打开 http://127.0.0.1:7860
+& $py app_router.py --port 7861                      # 路由器对比 Demo（默认最新微调模型 + router_ft），可与 app.py 同时开
+& $py app_router.py --weights yolo11s.pt             # 切回 COCO 零训练模型
+& $py app_router.py --dataset dota                   # DOTA 版路由器 Demo
 & $py scripts/illegal_parking.py --image datasets/VisDrone2019-DET-val/images/0000100_00504_d_0000004.jpg --auto-zone
 
 # ---- VisDrone-ft：微调检测器（2 类，切片辅助微调，GPU；docs/RESULTS-*-ft*.md） ----
@@ -251,6 +253,7 @@ $py = ".\.venv\Scripts\python.exe"
 
 上传一张图（或点示例），同屏对比 SAHI 全切和 Glance-SAHI 选片：切片数、检测框数、单图耗时，外加每片的扫视打分 S(k)。
 可切换三种检测器预设（COCO 零训练 / VisDrone 微调 / DOTA 官方 OBB），θ、λ 可拖动。耗时是本机单次实测，每种图像尺寸第一次运行前会先完整预热一遍。
+可学习路由器的对比 Demo 在 `app_router.py`。
 
 ## 在自己的代码里使用
 
