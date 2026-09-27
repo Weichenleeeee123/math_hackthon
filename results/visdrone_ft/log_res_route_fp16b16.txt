@@ -1,0 +1,19 @@
+visdrone_ft_fp16b16：训练 274 图 / 留出 274 图，选项 ['full@640', 'full@960', 'full@1280', 'full@1600', 'full@1920']
+训练集逐图边际 ΔAP 均值（×100）： {'full@640': np.float64(0.0), 'full@960': np.float64(0.0235), 'full@1280': np.float64(0.0339), 'full@1600': np.float64(0.0368), 'full@1920': np.float64(0.0366)}
+训练集上选出的工作点： {'op_time': 'λ=2.51e-03（对照 full@1280）', 'op_ap': 'λ=1.26e-04（对照 full@1920）'}
+     policy     AP    APs  ms_per_img
+   full@640 37.966 25.645      28.049
+   full@960 45.556 35.360      30.119
+  full@1280 48.659 39.639      31.551
+  full@1600 49.912 41.806      39.435
+  full@1920 50.230 42.658      46.805
+   sahi@512 47.338 39.289     130.706
+   sahi@640 45.820 36.983     103.155
+   sahi@768 45.505 35.764      71.373
+  sahi@1024 42.024 31.105      65.194
+ glance@0.9 47.359 39.310     158.671
+glance@0.99 47.364 39.265     123.133
+     op   lam       ref     AP  AP_ref    dAP  dAP_lo  dAP_hi    dAPs  dAPs_lo  dAPs_hi     ms  ms_ref  time_ratio  time_ratio_lo  time_ratio_hi  frac_full@640  frac_full@960  frac_full@1280  frac_full@1600  frac_full@1920
+op_time 0.003 full@1280 39.120  48.659 -9.538 -10.395  -8.578 -12.359  -13.689  -10.950 28.935  31.551       0.917          0.869          0.963          0.971          0.000           0.018           0.011           0.000
+  op_ap 0.000 full@1920 50.069  50.230 -0.160  -0.383   0.140  -0.645   -1.047   -0.379 61.625  46.805       1.317          1.274          1.356          0.113          0.007           0.292           0.347           0.241
+写出 C:\Users\31392\Desktop\数学建模\results\visdrone_ft\figures\fig15_res_route_fp16b16.png

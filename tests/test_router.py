@@ -83,6 +83,28 @@ def test_online_router_uses_training_lambda(tmp_path):
     assert np.allclose(p, RT.NumpyRouter([m]).predict_proba(X), atol=1e-6)
 
 
+def test_online_router_feature_cfg_comes_from_training(tmp_path):
+    """det_margin / heat_sigma / img_map_size 同理：取 router.json 记录的值，没记录则取训练默认值，与调用方 cfg 无关。"""
+    from glance_sahi.predict import score_slices
+
+    rng = np.random.default_rng(3)
+    img = (rng.random((700, 1300, 3)) * 255).astype(np.uint8)
+    r = _rec(h=700, w=1300)
+    caller = GlanceConfig(scorer="learned", det_margin=80, heat_sigma=1.0, img_map_size=256)
+    for meta_cfg in ({}, {"det_margin": 40, "heat_sigma": 3.0, "img_map_size": 384}):
+        train_cfg = GlanceConfig(**meta_cfg)
+        sal, scale = image_prior_map(img, "edge", train_cfg.img_map_size)
+        r["prior_edge"] = region_prior(sal, scale, r["slices"])
+        X = RT.features_from_rec(r, train_cfg)
+        m = RT.train_router(X, (X[:, 0] > 0.5).astype(np.float32), hidden=0, epochs=20, seed=0)
+        path = tmp_path / f"r{len(meta_cfg)}.json"
+        RT.save_router([m], {"default_threshold": 0.5, **meta_cfg}, path)
+        RT.load_router.cache_clear()
+        p, _, _ = score_slices(img, r["glance"], r["slices"],
+                               GlanceConfig(**{**caller.__dict__, "router_path": str(path)}))
+        assert np.allclose(p, RT.NumpyRouter([m]).predict_proba(X), atol=1e-6)
+
+
 # ---------------------------------------------------------------- 标签
 def test_gain_label_counts_only_new_hits():
     r = _rec(n=0)

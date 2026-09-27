@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -38,6 +39,19 @@ FEATURE_NAMES = (
     # --- 几何 ---
     "cx", "cy", "border", "area_frac", "log_n_slices", "scale",
 )
+
+# 会改变特征数值的配置项：训练时的取值存进 router.json 的 meta，推理时一律以它为准
+FEATURE_CFG_KEYS = ("img_weight", "det_margin", "heat_sigma", "img_map_size")
+
+
+def feature_cfg(cfg, meta: dict):
+    """推理时算特征用的配置：FEATURE_CFG_KEYS 取训练时的值，否则输入分布与训练不一致。
+
+    旧 router.json 没记录的项回退到 GlanceConfig 的默认值（训练脚本就是用默认值算的特征），
+    而不是调用方传进来的 cfg——调用方改了 det_margin 等参数不应该悄悄改变路由器的输入。
+    """
+    defaults = {f.name: f.default for f in dataclasses.fields(cfg)}
+    return dataclasses.replace(cfg, **{k: type(defaults[k])(meta.get(k, defaults[k])) for k in FEATURE_CFG_KEYS})
 
 
 # =============================================================================== 特征
@@ -112,7 +126,7 @@ def features_from_rec(rec: dict, cfg) -> np.ndarray:
 
 # =============================================================================== 标签
 def gt_targets(gt: dict) -> dict:
-    """每个非 crowd 目标：(cx, cy, 匹配半径, 评测类别, 是否小目标)。与 scripts/attribute.py 同口径。"""
+    """每个非 crowd 目标：(cx, cy, 匹配半径, 评测类别, 是否小目标 0/1)。router 训练与 scripts/attribute.py 共用。"""
     out: dict[int, list] = {}
     for a in gt["annotations"]:
         if a["iscrowd"]:
@@ -287,9 +301,6 @@ class NumpyRouter:
         if len(X) == 0:
             return np.zeros(0, np.float32)
         return np.mean([self._forward(mu, sd, L, X) for mu, sd, L in self._np], axis=0).astype(np.float32)
-
-    def features(self, glance, hw, slices, prior_edge, cfg) -> np.ndarray:
-        return slice_features(glance, hw, slices, prior_edge, cfg)
 
     @property
     def default_threshold(self) -> float:

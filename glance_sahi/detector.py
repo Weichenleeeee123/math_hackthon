@@ -20,11 +20,20 @@ def resolve_device(device: str = "auto") -> str:
         return "cpu"
 
 
-def build_model(weights: str = "yolo11s.pt", conf: float = 0.05, device: str = "auto", image_size: int = 640):
-    return AutoDetectionModel.from_pretrained(
+def build_model(weights: str = "yolo11s.pt", conf: float = 0.05, device: str = "auto", image_size: int = 640,
+                half: bool = False):
+    """half=True：FP16 推理（只在 CUDA 上生效）。RTX 3050 上整图 @1920 55 → 34 ms、15 片批推理 200 → 133 ms；
+    检测结果不再与 FP32 逐位一致，AP 差见 REPORT 3.18。默认 False，已有结果全部是 FP32。"""
+    device = resolve_device(device)
+    m = AutoDetectionModel.from_pretrained(
         model_type="ultralytics",
         model_path=weights,
         confidence_threshold=conf,
-        device=resolve_device(device),
+        device=device,
         image_size=image_size,
     )
+    if half and device != "cpu":
+        # ultralytics ≥ 8.4 用 quantize=16 取代 half；SAHI 每次调用都经 model(...) 走 predictor，会读到这个 override
+        m.model.overrides["quantize"] = 16
+        m.model.predictor = None
+    return m

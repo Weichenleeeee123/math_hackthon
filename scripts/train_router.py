@@ -247,6 +247,7 @@ def main(a):
                 default_threshold=float(thr_op), default_rho=float(rho_op),
                 thresholds_for_fraction={str(b): RT.global_threshold(P_fit, b) for b in a.budgets},
                 img_weight=a.img_weight, train_seconds=t_train, n_params=router.n_params)
+    meta.update({k: getattr(cfg, k) for k in RT.FEATURE_CFG_KEYS})  # 推理时据此重建特征口径（predict.score_slices）
     RT.save_router(members, meta, R.RES / f"router{a.tag}.json")
     gates = {n: np.concatenate(P[n]).tolist() for n in ("router", "router_alpha0", "router_alphaHi") if n in P}
     (R.RES / f"router_gates{a.tag}.json").write_text(json.dumps(gates))

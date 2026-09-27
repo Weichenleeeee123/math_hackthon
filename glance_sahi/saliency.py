@@ -169,3 +169,32 @@ def fuse(s_det: np.ndarray, s_img: np.ndarray | None, img_weight: float) -> np.n
     if s_img is None or img_weight <= 0:
         return s_det
     return 1.0 - (1.0 - s_det) * (1.0 - img_weight * s_img)
+
+
+REL_KINDS = ("q25", "median", "rank")
+
+
+def relativize(s: np.ndarray, kind: str = "q25") -> np.ndarray:
+    """图像内相对化（饱和鲁棒门控）：把分数减去本图的"背景水平"，再按本图动态范围归一。
+
+    为什么：检测器越强，扫视的弱证据越到处都是，noisy-OR 的分数整图饱和
+    （VisDrone-ft 上手工门平均分 0.94、ECE 0.61，θ=0.9 只能省 9% 切片，见 docs/RESULTS-router-ft）。
+    绝对阈值 θ 失去分辨力，但"哪片证据比本图典型水平突出"仍然有意义——把 θ 的含义从
+    "绝对证据水平"改成"本图内的相对突出程度"，逐图自适应，零训练。
+
+    kind:
+      "q25"    背景 = 本图 25 分位，尺度 = 90 分位 − 背景（默认：保留大部分分辨力，对个别空片稳健）
+      "median" 背景 = 本图中位数（更激进：约一半切片被压到 0）
+      "rank"   本图内平均秩 → [0,1]（完全自适应，θ 直接对应"每图 top (1−θ) 比例"）
+    """
+    s = np.asarray(s, np.float32)
+    if kind == "none" or len(s) == 0:
+        return s
+    if kind == "rank":
+        r = np.argsort(np.argsort(s, kind="stable"), kind="stable")
+        return (r / max(len(s) - 1, 1)).astype(np.float32)
+    if kind not in REL_KINDS:
+        raise ValueError(f"unknown relativize kind {kind!r}, expected one of {REL_KINDS}")
+    bg = float(np.percentile(s, 50 if kind == "median" else 25))
+    hi = float(np.percentile(s, 90))
+    return np.clip((s - bg) / (hi - bg + 1e-6), 0, 1).astype(np.float32)

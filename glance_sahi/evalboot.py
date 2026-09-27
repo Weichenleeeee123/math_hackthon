@@ -59,9 +59,6 @@ class CachedEval:
         self.empty = not dets
         self.max_dets = max_dets
 
-    def idx_of(self, img_ids) -> np.ndarray:
-        return np.array([self.order[i] for i in img_ids], int)
-
     def ap(self, img_idx=None, area: str = "all") -> float:
         """img_idx：pycocotools 内部顺序下的图像下标多重集（None = 全部各一次）。"""
         if self.empty:
